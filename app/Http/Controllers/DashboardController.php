@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerDevice;
@@ -25,6 +26,7 @@ use App\Models\Supplier;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\TechnicianTrip;
 use App\Services\InventoryService;
 use App\Services\ProcurementService;
 use App\Services\SalesAndInvoicingService;
@@ -66,6 +68,10 @@ class DashboardController extends Controller
         if ($activeTab) {
             $redirect = $redirect->with('_active_tab', $activeTab);
         }
+        $hrSubview = $request->input('_hr_subview');
+        if ($hrSubview) {
+            $redirect = $redirect->with('erp_hr_active_subview', $hrSubview);
+        }
         return $redirect;
     }
 
@@ -95,6 +101,7 @@ class DashboardController extends Controller
         $isSalesRep     = $currentUser?->hasRole('sales_rep') ?? false;
         $isProcurement  = $currentUser?->hasRole('procurement_manager') ?? false;
         $isGeneralMgr   = $currentUser?->hasRole('general_manager') ?? false;
+        $isHrManager    = $currentUser?->hasRole('hr_manager') || ($currentUser?->hasPermission('hr.portal.view') ?? false);
 
 
 
@@ -227,6 +234,12 @@ class DashboardController extends Controller
             ->where('is_active', true)
             ->get();
 
+        // 6b. جميع المنتجات لشاشة الأصناف (بما فيها غير النشطة)
+        $allProducts = Product::with(['category', 'stockBalances'])->latest()->get();
+
+        // 6c. التصنيفات للفلاتر وإضافة الأصناف
+        $categories = Category::where('is_active', true)->get();
+
         // 7. المستودعات وسيارات الفنيين
         $warehouses = Warehouse::with(['assignedUser', 'stockBalances.product'])->get();
 
@@ -270,6 +283,144 @@ class DashboardController extends Controller
         $groupedPermissions = Permission::all()->groupBy('module');
         $allPermissions = Permission::orderBy('module')->get();
 
+        // 18. تتبع الفنيين - Technician Trips
+        $technicianTrips = TechnicianTrip::with(['technician', 'ticket'])->orderByDesc('departure_time')->get();
+        $openTickets = MaintenanceTicket::whereIn('status', ['open', 'in_progress'])->orderByDesc('id')->get();
+
+                // 19. الموارد البشرية - Human Resources (HR) Data
+        $hasHr = \Illuminate\Support\Facades\Schema::hasTable('employees');
+        $hrEmployees = $hasHr ? DB::table('employees')
+            ->leftJoin('users', 'employees.user_id', '=', 'users.id')
+            ->leftJoin('role_user', 'users.id', '=', 'role_user.user_id')
+            ->leftJoin('roles', 'role_user.role_id', '=', 'roles.id')
+            ->select(
+                'employees.*',
+                'users.email as user_email',
+                'roles.name as role_name',
+                'roles.display_name_ar as role_display_name'
+            )
+            ->orderBy('employees.created_at', 'desc')
+            ->get()
+            ->unique('id') : collect();
+        $hrAttendance = ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('attendance')) ? DB::table('attendance')
+            ->leftJoin('employees', 'attendance.employee_id', '=', 'employees.id')
+            ->select('attendance.*', 'employees.full_name as emp_name', 'employees.employee_code')
+            ->orderBy('attendance.work_date', 'desc')
+            ->take(60)
+            ->get() : collect();
+        $hrLeaveRequests = ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) ? DB::table('leave_requests')
+            ->leftJoin('employees', 'leave_requests.employee_id', '=', 'employees.id')
+            ->select('leave_requests.*', 'employees.full_name as emp_name', 'employees.employee_code')
+            ->orderBy('leave_requests.created_at', 'desc')
+            ->take(60)
+            ->get() : collect();
+        $hrPayrolls = ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('payroll')) ? DB::table('payroll')
+            ->leftJoin('employees', 'payroll.employee_id', '=', 'employees.id')
+            ->select('payroll.*', 'employees.full_name as emp_name', 'employees.employee_code')
+            ->orderBy('payroll.created_at', 'desc')
+            ->take(60)
+            ->get() : collect();
+        $hrEntitlements = ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('entitlements')) ? DB::table('entitlements')
+            ->leftJoin('employees', 'entitlements.employee_id', '=', 'employees.id')
+            ->select('entitlements.*', 'employees.full_name as emp_name', 'employees.employee_code')
+            ->orderBy('entitlements.date', 'desc')
+            ->take(60)
+            ->get() : collect();
+        $hrCustodies = ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('custodies')) ? DB::table('custodies')
+            ->leftJoin('custody_assignments', function($join) {
+                $join->on('custodies.id', '=', 'custody_assignments.custody_id')
+                     ->whereNull('custody_assignments.returned_at');
+            })
+            ->leftJoin('employees', 'custody_assignments.employee_id', '=', 'employees.id')
+            ->select('custodies.*', 'employees.full_name as emp_name', 'custody_assignments.assigned_at')
+            ->get() : collect();
+        $hrTasks = ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('tasks')) ? DB::table('tasks')
+            ->leftJoin('employees', 'tasks.employee_id', '=', 'employees.id')
+            ->select('tasks.*', 'employees.full_name as emp_name')
+            ->orderBy('tasks.created_at', 'desc')
+            ->take(60)
+            ->get() : collect();
+        $hrDepartments = \Illuminate\Support\Facades\Schema::hasTable('departments') ? DB::table('departments')->get() : collect();
+        
+        $hrKpis = [
+            'total_employees' => $hrEmployees->count(),
+            'active_employees' => $hrEmployees->where('is_active', 1)->count(),
+            'today_attendance' => ($hasHr && \Illuminate\Support\Facades\Schema::hasTable('attendance')) ? DB::table('attendance')->where('work_date', date('Y-m-d'))->count() : 0,
+            'pending_requests' => $hrLeaveRequests->where('status', 'pending')->count(),
+            'total_payroll' => $hrPayrolls->sum('net_salary'),
+            'total_tasks' => $hrTasks->count(),
+            'completed_tasks' => $hrTasks->where('status', 'completed')->count(),
+        ];
+
+        // تقارير أداء الكادر البشري المرتبطة بنظام الفلاتر والمبيعات والتحصيلات والصيانة
+        $hasInvoices = \Illuminate\Support\Facades\Schema::hasTable('invoices');
+        $hasPayments = \Illuminate\Support\Facades\Schema::hasTable('payments');
+        $hasTickets = \Illuminate\Support\Facades\Schema::hasTable('maintenance_tickets');
+        $hasTrips = \Illuminate\Support\Facades\Schema::hasTable('technician_trips');
+
+        $systemHrMetrics = [
+            'total_sales' => $hasInvoices ? (float) DB::table('invoices')->where('status', '!=', 'cancelled')->sum('grand_total') : 0,
+            'total_sales_count' => $hasInvoices ? DB::table('invoices')->where('status', '!=', 'cancelled')->count() : 0,
+            'total_paid' => $hasInvoices ? (float) DB::table('invoices')->where('status', '!=', 'cancelled')->sum('paid_amount') : 0,
+            'total_receivables' => $hasInvoices ? (float) DB::table('invoices')->where('status', '!=', 'cancelled')->sum('balance_due') : 0,
+            'total_trips' => $hasTrips ? DB::table('technician_trips')->count() : 0,
+            'total_km' => $hasTrips ? (float) DB::table('technician_trips')->sum('km_traveled') : 0,
+            'total_tickets' => $hasTickets ? DB::table('maintenance_tickets')->count() : 0,
+            'completed_tickets' => $hasTickets ? DB::table('maintenance_tickets')->where('status', 'completed')->count() : 0,
+            'total_monthly_salaries' => (float) $hrEmployees->sum('base_salary'),
+        ];
+
+        $hrEmployeePerformance = $hrEmployees->map(function ($emp) use ($hasInvoices, $hasPayments, $hasTickets, $hasTrips) {
+            $userId = $emp->user_id;
+
+            $salesCount = ($hasInvoices && $userId) ? DB::table('invoices')->where('created_by', $userId)->where('status', '!=', 'cancelled')->count() : 0;
+            $salesTotal = ($hasInvoices && $userId) ? (float) DB::table('invoices')->where('created_by', $userId)->where('status', '!=', 'cancelled')->sum('grand_total') : 0;
+
+            $collectionsCount = ($hasPayments && $userId) ? DB::table('payments')->where('received_by', $userId)->count() : 0;
+            $collectionsTotal = ($hasPayments && $userId) ? (float) DB::table('payments')->where('received_by', $userId)->sum('amount') : 0;
+
+            $assignedTickets = ($hasTickets && $userId) ? DB::table('maintenance_tickets')->where('technician_id', $userId)->count() : 0;
+            $completedTickets = ($hasTickets && $userId) ? DB::table('maintenance_tickets')->where('technician_id', $userId)->where('status', 'completed')->count() : 0;
+
+            $tripsCount = ($hasTrips && $userId) ? DB::table('technician_trips')->where('technician_id', $userId)->count() : 0;
+            $tripsKm = ($hasTrips && $userId) ? (float) DB::table('technician_trips')->where('technician_id', $userId)->sum('km_traveled') : 0;
+
+            $custodiesCount = \Illuminate\Support\Facades\Schema::hasTable('custody_assignments') 
+                ? DB::table('custody_assignments')->where('employee_id', $emp->id)->whereNull('returned_at')->count() 
+                : 0;
+
+            $tasksCount = \Illuminate\Support\Facades\Schema::hasTable('tasks')
+                ? DB::table('tasks')->where('employee_id', $emp->id)->count()
+                : 0;
+            $tasksCompleted = \Illuminate\Support\Facades\Schema::hasTable('tasks')
+                ? DB::table('tasks')->where('employee_id', $emp->id)->where('status', 'completed')->count()
+                : 0;
+
+            return (object) [
+                'id' => $emp->id,
+                'user_id' => $userId,
+                'name' => !empty($emp->full_name_ar) ? $emp->full_name_ar : (!empty($emp->full_name) ? $emp->full_name : 'موظف'),
+                'code' => $emp->employee_code,
+                'job_title' => !empty($emp->job_title_ar) ? $emp->job_title_ar : (!empty($emp->job_title) ? $emp->job_title : (!empty($emp->role_display_name) ? $emp->role_display_name : 'كادر تشغيلي')),
+                'role_name' => $emp->role_name ?? null,
+                'role_display_name' => $emp->role_display_name ?? null,
+                'email' => $emp->user_email ?: $emp->email,
+                'phone' => $emp->phone,
+                'base_salary' => (float) ($emp->base_salary ?? 0),
+                'sales_count' => $salesCount,
+                'sales_total' => $salesTotal,
+                'collections_count' => $collectionsCount,
+                'collections_total' => $collectionsTotal,
+                'assigned_tickets' => $assignedTickets,
+                'completed_tickets' => $completedTickets,
+                'trips_count' => $tripsCount,
+                'trips_km' => $tripsKm,
+                'custodies_count' => $custodiesCount,
+                'tasks_count' => $tasksCount,
+                'tasks_completed' => $tasksCompleted,
+            ];
+        });
+
         // 17. بيانات التقارير التجميعية السريعة
         $topSellingProducts = Product::where('type', '!=', 'service')
             ->take(6)
@@ -289,6 +440,7 @@ class DashboardController extends Controller
             'isSalesRep',
             'isProcurement',
             'isGeneralMgr',
+            'isHrManager',
             'stats',
             'tickets',
             'dueStages',
@@ -296,6 +448,8 @@ class DashboardController extends Controller
             'deviceModels',
             'technicians',
             'products',
+            'allProducts',
+            'categories',
             'warehouses',
             'auditLogs',
             'interactions',
@@ -308,7 +462,20 @@ class DashboardController extends Controller
             'allRoles',
             'groupedPermissions',
             'allPermissions',
-            'topSellingProducts'
+            'topSellingProducts',
+            'technicianTrips',
+            'openTickets',
+            'hrEmployees',
+            'hrAttendance',
+            'hrLeaveRequests',
+            'hrPayrolls',
+            'hrEntitlements',
+            'hrCustodies',
+            'hrTasks',
+            'hrDepartments',
+            'hrKpis',
+            'systemHrMetrics',
+            'hrEmployeePerformance'
         ));
     }
 
@@ -440,6 +607,9 @@ class DashboardController extends Controller
     public function createSupplier(Request $request)
     {
         if (Auth::user()?->hasRole('call_center')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'غير مصرح لموظف خدمة العملاء بإضافة موردين.'], 403);
+            }
             return redirect()->back()->with('error', 'غير مصرح لموظف خدمة العملاء بإضافة موردين.');
         }
 
@@ -470,7 +640,15 @@ class DashboardController extends Controller
             'created_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', "تمت إضافة المورد الجديد ({$supplier->name}) بنجاح.");
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "تمت إضافة المورد الجديد ({$supplier->name}) بنجاح.",
+                'supplier' => $supplier,
+            ]);
+        }
+
+        return $this->redirectBackWithTab($request, "تمت إضافة المورد الجديد ({$supplier->name}) بنجاح.");
     }
 
     /**
@@ -493,6 +671,9 @@ class DashboardController extends Controller
     public function createPurchaseOrder(Request $request)
     {
         if (Auth::user()?->hasRole('call_center')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'غير مصرح لموظف خدمة العملاء بإنشاء أوامر شراء ومشتريات.'], 403);
+            }
             return redirect()->back()->with('error', 'غير مصرح لموظف خدمة العملاء بإنشاء أوامر شراء ومشتريات.');
         }
 
@@ -501,14 +682,33 @@ class DashboardController extends Controller
             'warehouse_id' => 'required|exists:warehouses,id',
             'order_date' => 'required|date',
             'notes' => 'nullable|string',
+            'vendor_invoice_number' => 'nullable|string|max:100',
+            'tax_percent' => 'nullable|numeric|min:0|max:100',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'tax_amount' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.tax_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $supplier = Supplier::findOrFail($validated['supplier_id']);
         $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
+
+        $taxPercent = $validated['tax_percent'] ?? $validated['tax_rate'] ?? null;
+        $taxAmount = null;
+        if (isset($validated['tax_amount']) && $validated['tax_amount'] !== null && $validated['tax_amount'] !== '') {
+            $taxAmount = (float)$validated['tax_amount'];
+        } elseif ($taxPercent !== null && $taxPercent !== '') {
+            $subtotal = 0;
+            foreach ($validated['items'] as $item) {
+                $subtotal += ((int)$item['quantity'] * (float)$item['unit_price']);
+            }
+            $taxAmount = round($subtotal * ((float)$taxPercent / 100), 2);
+        } else {
+            $taxAmount = 0.00;
+        }
 
         $po = $this->procurementService->createPurchaseOrder(
             supplier: $supplier,
@@ -516,10 +716,31 @@ class DashboardController extends Controller
             items: $validated['items'],
             orderDate: $validated['order_date'],
             notes: $validated['notes'] ?? null,
-            user: Auth::user()
+            user: Auth::user(),
+            taxAmount: $taxAmount,
+            vendorInvoiceNumber: $validated['vendor_invoice_number'] ?? null
         );
 
-        return redirect()->back()->with('success', "تم إنشاء أمر الشراء بنجاح برقم ({$po->po_number}) بقيمة " . number_format($po->total_amount, 2) . " ر.س");
+        $extra = [];
+        if ($request->input('action') === 'save_and_print' || $request->input('save_and_print') == '1') {
+            $extra['print_po_url'] = route('procurement.orders.print', $po->id);
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "تم إنشاء أمر الشراء بنجاح برقم ({$po->po_number})",
+                'po' => $po,
+                'print_url' => route('procurement.orders.print', $po->id),
+            ]);
+        }
+
+        return $this->redirectBackWithTab(
+            $request,
+            "تم إنشاء أمر الشراء بنجاح برقم ({$po->po_number}) بقيمة إجمالية " . number_format($po->total_amount + ($po->tax_amount ?? 0), 2) . " ر.س",
+            null,
+            $extra
+        );
     }
 
     /**
@@ -1307,6 +1528,133 @@ class DashboardController extends Controller
     }
 
     /**
+     * تحديث النظام وسحب أحدث نسخة من GitHub (Git Pull & Migrate & Cache)
+     */
+    public function systemUpdate(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user || (!$user->hasRole('super_admin') && !$user->hasRole('system_admin'))) {
+            return redirect()->back()->with('error', 'ليس لديك صلاحية تحديث النظام.');
+        }
+
+        $basePath = base_path();
+        $logs = [];
+        $hasError = false;
+
+        $logs[] = "========================================================";
+        $logs[] = "🚀 بدء عملية تحديث النظام من GitHub: " . now()->format('Y-m-d H:i:s');
+        $logs[] = "المسار الأساسي للمشروع: " . $basePath;
+        $logs[] = "========================================================";
+
+        // 1. سحب التحديثات عبر Git
+        $gitCmd = "cd " . escapeshellarg($basePath) . " && git fetch origin main 2>&1 && git pull origin main 2>&1";
+        $gitOutput = null;
+        if (function_exists('shell_exec')) {
+            $gitOutput = @shell_exec($gitCmd);
+        } elseif (function_exists('exec')) {
+            @exec($gitCmd, $outArr);
+            $gitOutput = implode("\n", $outArr);
+        }
+
+        if ($gitOutput) {
+            $logs[] = "[1/4] مخرجات سحب الكود (Git Pull):\n" . trim($gitOutput);
+        } else {
+            $logs[] = "[1/4] تنبيه Git: تم تنفيذ أمر السحب عبر السيرفر (في حال الاستضافة المشتركة، يمكنك أيضاً السحب مباشرة عبر لوحة Git في hPanel أو رابط Webhook المرفق).";
+        }
+
+        // 2. تشغيل المايجريشن لتحديث جداول قاعدة البيانات
+        try {
+            Artisan::call('migrate', ['--force' => true]);
+            $logs[] = "[2/4] تحديث قاعدة البيانات (Migrations):\n" . trim(Artisan::output());
+        } catch (\Throwable $e) {
+            $hasError = true;
+            $logs[] = "[2/4] خطأ في المايجريشن: " . $e->getMessage();
+        }
+
+        // 3. مسح الملفات المؤقتة والكاش
+        try {
+            Artisan::call('view:clear');
+            Artisan::call('config:clear');
+            Artisan::call('route:clear');
+            Artisan::call('cache:clear');
+            $logs[] = "[3/4] مسح الكاش المؤقت: تم مسح كاش القوالب والتوجيه بنجاح.";
+        } catch (\Throwable $e) {
+            $logs[] = "[3/4] تنبيه في مسح الكاش: " . $e->getMessage();
+        }
+
+        // 4. إعادة بناء وتحسين الكاش لتسريع النظام
+        try {
+            Artisan::call('view:cache');
+            Artisan::call('config:cache');
+            Artisan::call('route:cache');
+            $logs[] = "[4/4] إعادة بناء الكاش وتجهيز النظام: تمت بنجاح وبأعلى سرعة.";
+        } catch (\Throwable $e) {
+            $logs[] = "[4/4] تنبيه في بناء الكاش: " . $e->getMessage();
+        }
+
+        $fullLog = implode("\n\n", $logs);
+
+        // حفظ وقت آخر تحديث وسجله في الإعدادات
+        if (\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+            SystemSetting::set('last_system_update_at', now()->format('Y-m-d H:i:s'));
+            SystemSetting::set('last_system_update_log', $fullLog);
+        }
+
+        $msg = $hasError 
+            ? 'تم تنفيذ التحديث ولكن حدثت بعض الملاحظات (يرجى مراجعة سجل المخرجات أدناه).' 
+            : 'تم سحب التحديثات من GitHub وتحديث النظام وقاعدة البيانات بنجاح!';
+
+        return $this->redirectBackWithTab(
+            $request,
+            $hasError ? null : $msg,
+            $hasError ? $msg : null,
+            ['system_update_log' => $fullLog]
+        );
+    }
+
+    /**
+     * Webhook لتحديث السيرفر تلقائياً عند عمل Git Push من GitHub
+     */
+    public function deployWebhook(Request $request)
+    {
+        $secretToken = SystemSetting::get('deploy_webhook_token', 'whater_deploy_secret_2026');
+        $givenToken = $request->input('token') ?? $request->header('X-Git-Token') ?? $request->header('X-Webhook-Token');
+
+        if ($givenToken !== $secretToken) {
+            return response()->json(['status' => 'unauthorized', 'message' => 'رمز التحقق غير صحيح'], 401);
+        }
+
+        $basePath = base_path();
+        $gitCmd = "cd " . escapeshellarg($basePath) . " && git pull origin main 2>&1";
+        $gitOutput = function_exists('shell_exec') ? @shell_exec($gitCmd) : 'exec not allowed';
+
+        try {
+            Artisan::call('migrate', ['--force' => true]);
+            Artisan::call('view:clear');
+            Artisan::call('config:clear');
+            Artisan::call('route:clear');
+            Artisan::call('view:cache');
+            Artisan::call('config:cache');
+            Artisan::call('route:cache');
+            
+            SystemSetting::set('last_system_update_at', now()->format('Y-m-d H:i:s'));
+            SystemSetting::set('last_system_update_log', $gitOutput);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'تم تحديث هوستنجر بنجاح عبر Webhook',
+                'git_output' => $gitOutput,
+                'timestamp' => now()->toISOString()
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * ==========================================
      * إدارة العملاء ومحطات التحلية (Customers CRUD)
      * ==========================================
@@ -1938,5 +2286,492 @@ class DashboardController extends Controller
             return redirect()->back()->with('error', 'حدث خطأ أثناء إجراء الجرد: ' . $e->getMessage());
         }
     }
-}
 
+    /**
+     * إنشاء صنف/منتج جديد في قاعدة البيانات
+     */
+    public function createProduct(Request $request)
+    {
+        if (Auth::user()?->hasRole('call_center') || Auth::user()?->hasRole('customer')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'غير مصرح لك بإضافة أصناف.'], 403);
+            }
+            return redirect()->back()->with('error', 'غير مصرح لك بإضافة أصناف.');
+        }
+
+        $validated = $request->validate([
+            'name_ar'       => 'required|string|max:191',
+            'name_en'       => 'nullable|string|max:191',
+            'sku'           => 'nullable|string|max:64|unique:products,sku',
+            'barcode'       => 'nullable|string|max:64|unique:products,barcode',
+            'category_id'   => 'nullable|exists:categories,id',
+            'type'          => 'required|in:water_device,filter_cartridge,membrane,pump,spare_part,service',
+            'is_compound'   => 'nullable|boolean',
+            'unit'          => 'nullable|string|max:32',
+            'cost_price'    => 'nullable|numeric|min:0',
+            'selling_price' => 'nullable|numeric|min:0',
+            'reorder_level' => 'nullable|integer|min:0',
+            'description'   => 'nullable|string',
+            'is_active'     => 'nullable|boolean',
+        ]);
+
+        if (empty($validated['sku'])) {
+            $validated['sku'] = 'SKU-' . strtoupper(Str::random(8));
+        }
+
+        $validated['is_compound'] = $request->has('is_compound') ? (bool)$request->input('is_compound') : false;
+        $validated['is_active']   = $request->has('is_active') ? (bool)$request->input('is_active') : true;
+        $validated['unit']        = $validated['unit'] ?? 'piece';
+        $validated['cost_price']  = $validated['cost_price'] ?? 0.00;
+        $validated['selling_price'] = $validated['selling_price'] ?? 0.00;
+
+        $product = Product::create($validated);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "تم إضافة الصنف ({$product->name_ar}) بنجاح.",
+                'product' => $product,
+            ]);
+        }
+
+        return $this->redirectBackWithTab($request, "تم إضافة الصنف ({$product->name_ar}) بنجاح.");
+    }
+
+    /**
+     * تحديث بيانات صنف
+     */
+    public function updateProduct(Request $request, Product $product)
+    {
+        if (Auth::user()?->hasRole('call_center') || Auth::user()?->hasRole('customer')) {
+            return $this->redirectBackWithTab($request, null, 'غير مصرح لك بتعديل بيانات الأصناف.');
+        }
+
+        $validated = $request->validate([
+            'name_ar'       => 'required|string|max:191',
+            'name_en'       => 'nullable|string|max:191',
+            'sku'           => 'required|string|max:64|unique:products,sku,' . $product->id,
+            'barcode'       => 'nullable|string|max:64|unique:products,barcode,' . $product->id,
+            'category_id'   => 'nullable|exists:categories,id',
+            'type'          => 'required|in:water_device,filter_cartridge,membrane,pump,spare_part,service',
+            'is_compound'   => 'nullable|boolean',
+            'unit'          => 'nullable|string|max:32',
+            'cost_price'    => 'nullable|numeric|min:0',
+            'selling_price' => 'nullable|numeric|min:0',
+            'created_at'    => 'nullable|date',
+        ]);
+
+        $validated['is_compound'] = $request->has('is_compound') ? (bool)$request->input('is_compound') : false;
+        if (!empty($validated['created_at'])) {
+            $product->created_at = $validated['created_at'];
+        }
+        unset($validated['created_at']);
+
+        $product->update($validated);
+
+        return $this->redirectBackWithTab($request, "تم تحديث بيانات الصنف ({$product->name_ar}) بنجاح.");
+    }
+
+    /**
+     * حذف صنف
+     */
+    public function deleteProduct(Request $request, Product $product)
+    {
+        if (Auth::user()?->hasRole('call_center') || Auth::user()?->hasRole('customer')) {
+            return $this->redirectBackWithTab($request, null, 'غير مصرح لك بحذف الأصناف.');
+        }
+
+        $name = $product->name_ar;
+        $product->delete();
+
+        return $this->redirectBackWithTab($request, "تم حذف الصنف ({$name}) بنجاح.");
+    }
+
+    /**
+     * طباعة بطاقة صنف / باركود
+     */
+    public function printProduct(Product $product)
+    {
+        $product->load(['category', 'stockBalances.warehouse']);
+        return view('products.print', compact('product'));
+    }
+
+    /**
+     * حذف أمر شراء (فقط المسودات غير المستلمة)
+     */
+    public function deletePurchaseOrder(PurchaseOrder $po, Request $request)
+    {
+        if ($po->status === 'received') {
+            return $this->redirectBackWithTab($request, null, 'لا يمكن حذف أمر شراء تم استلامه مسبقاً.');
+        }
+
+        $poNumber = $po->po_number;
+        $po->items()->delete();
+        $po->delete();
+
+        return $this->redirectBackWithTab($request, "تم حذف أمر الشراء ({$poNumber}) بنجاح.");
+    }
+
+    // ============================================================
+    // تتبع الفنيين - Technician Field Tracking
+    // ============================================================
+
+    public function getTechnicianTrips(Request $request)
+    {
+        $trips = TechnicianTrip::with(['technician', 'ticket', 'creator'])
+            ->orderByDesc('departure_time')
+            ->get();
+        return response()->json(['trips' => $trips]);
+    }
+
+    public function createTechnicianTrip(Request $request)
+    {
+        $validated = $request->validate([
+            'technician_id'       => 'required|exists:users,id',
+            'ticket_id'           => 'nullable|exists:maintenance_tickets,id',
+            'vehicle_description' => 'nullable|string|max:100',
+            'destination_address' => 'required|string|max:255',
+            'latitude'            => 'nullable|numeric',
+            'longitude'           => 'nullable|numeric',
+            'odometer_start'      => 'nullable|numeric|min:0',
+            'departure_time'      => 'required|date',
+            'notes'               => 'nullable|string',
+        ]);
+        $validated['created_by'] = auth()->id() ?? 1;
+        $validated['status'] = 'dispatched';
+
+        if (empty($validated['latitude']) || empty($validated['longitude'])) {
+            $validated['latitude'] = 24.7136 + (mt_rand(-50, 50) / 1000);
+            $validated['longitude'] = 46.6753 + (mt_rand(-50, 50) / 1000);
+        }
+
+        $trip = TechnicianTrip::create($validated);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'trip' => $trip->load('technician', 'ticket')]);
+        }
+        return $this->redirectBackWithTab($request, "تم إرسال الفني بنجاح وتسجيل بيانات الرحلة.");
+    }
+
+    public function updateTechnicianTrip(Request $request, TechnicianTrip $trip)
+    {
+        $validated = $request->validate([
+            'technician_id'       => 'required|exists:users,id',
+            'ticket_id'           => 'nullable|exists:maintenance_tickets,id',
+            'vehicle_description' => 'nullable|string|max:100',
+            'destination_address' => 'required|string|max:255',
+            'latitude'            => 'nullable|numeric',
+            'longitude'           => 'nullable|numeric',
+            'odometer_start'      => 'nullable|numeric|min:0',
+            'odometer_end'        => 'nullable|numeric|min:0',
+            'departure_time'      => 'required|date',
+            'return_time'         => 'nullable|date',
+            'work_performed'      => 'nullable|string',
+            'notes'               => 'nullable|string',
+            'status'              => 'required|in:dispatched,on_trip,returned,cancelled',
+        ]);
+        if (!empty($validated['odometer_end']) && !empty($validated['odometer_start'])) {
+            $validated['km_traveled'] = max(0, $validated['odometer_end'] - $validated['odometer_start']);
+        }
+        $trip->update($validated);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'trip' => $trip->load('technician', 'ticket')]);
+        }
+        return $this->redirectBackWithTab($request, "تم تحديث بيانات الرحلة بنجاح.");
+    }
+
+    public function markTechnicianReturned(Request $request, TechnicianTrip $trip)
+    {
+        $validated = $request->validate([
+            'odometer_end'   => 'nullable|numeric|min:0',
+            'work_performed' => 'nullable|string',
+            'return_time'    => 'nullable|date',
+            'notes'          => 'nullable|string',
+        ]);
+        $validated['status']      = 'returned';
+        $validated['return_time'] = !empty($validated['return_time']) ? $validated['return_time'] : now();
+        if (!empty($validated['odometer_end']) && $trip->odometer_start) {
+            $validated['km_traveled'] = max(0, $validated['odometer_end'] - $trip->odometer_start);
+        }
+        $trip->update($validated);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'trip' => $trip->load('technician', 'ticket')]);
+        }
+        return $this->redirectBackWithTab($request, "تم تسجيل عودة الفني بنجاح واحتساب المسافة المقطوعة.");
+    }
+
+    public function deleteTechnicianTrip(TechnicianTrip $trip, Request $request)
+    {
+        $trip->delete();
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true]);
+        }
+        return $this->redirectBackWithTab($request, "تم حذف سجل الرحلة بنجاح.");
+    }
+
+
+    // ============================================================
+    // الموارد البشرية - Human Resources (HR)
+    // ============================================================
+
+    public function hrCreateEmployee(Request $request)
+    {
+        $validated = $request->validate([
+            'full_name'      => 'required|string|max:191',
+            'employee_code'  => 'required|string|max:50',
+            'email'          => 'required|email|unique:users,email|max:191',
+            'password'       => 'required|string|min:6',
+            'role_id'        => 'required|exists:roles,id',
+            'phone'          => 'nullable|string|max:32',
+            'national_id'    => 'nullable|string|max:32',
+            'job_title_ar'   => 'nullable|string|max:100',
+            'base_salary'    => 'nullable|numeric|min:0',
+            'hire_date'      => 'nullable|date',
+            'is_hr_manager'  => 'nullable|boolean',
+        ]);
+
+        // 1. إنشاء حساب مستخدم للنظام لتمكين تسجيل الدخول والصلاحيات
+        $user = User::create([
+            'name'     => $validated['full_name'],
+            'email'    => $validated['email'],
+            'phone'    => $validated['phone'] ?? null,
+            'password' => \Illuminate\Support\Facades\Hash::make($validated['password']),
+        ]);
+
+        // 2. ربط الدور المختار بنظام الفلاتر
+        $user->roles()->attach($validated['role_id']);
+        if (!empty($validated['is_hr_manager'])) {
+            $hrRole = Role::where('name', 'hr_manager')->first();
+            if ($hrRole) {
+                $user->roles()->syncWithoutDetaching([$hrRole->id]);
+            }
+        }
+
+        // 3. تحديد المسمى الوظيفي بناءً على الدور أو الإدخال
+        $assignedRole = Role::find($validated['role_id']);
+        $jobTitle = !empty($validated['job_title_ar']) ? $validated['job_title_ar'] : ($assignedRole ? $assignedRole->display_name_ar : 'موظف في نظام الفلاتر');
+
+        // 4. حفظ سجل الموظف في جدول الموارد البشرية
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('employees')->insert([
+            'id'            => $uuid,
+            'user_id'       => $user->id,
+            'full_name'     => $validated['full_name'],
+            'full_name_ar'  => $validated['full_name'],
+            'email'         => $validated['email'],
+            'employee_code' => $validated['employee_code'],
+            'phone'         => $validated['phone'] ?? null,
+            'national_id'   => $validated['national_id'] ?? null,
+            'job_title'     => $jobTitle,
+            'job_title_ar'  => $jobTitle,
+            'base_salary'   => $validated['base_salary'] ?? 0,
+            'hire_date'     => $validated['hire_date'] ?? date('Y-m-d'),
+            'is_active'     => 1,
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تمت إضافة الموظف ({$validated['full_name']}) بنجاح وتعيين دوره كـ ({$jobTitle}) مع إنشاء حساب الدخول للنظام.");
+    }
+
+    public function hrDeleteEmployee($id, Request $request)
+    {
+        \Illuminate\Support\Facades\DB::table('employees')->where('id', $id)->delete();
+        return $this->redirectBackWithTab($request, "تم حذف الموظف بنجاح.");
+    }
+
+    public function hrRecordAttendance(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|string',
+            'work_date'   => 'required|date',
+            'check_in'    => 'nullable',
+            'check_out'   => 'nullable',
+            'status'      => 'required|in:present,absent,late,excused',
+        ]);
+
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('attendance')->insert([
+            'id'          => $uuid,
+            'employee_id' => $validated['employee_id'],
+            'work_date'   => $validated['work_date'],
+            'check_in'    => $validated['check_in'] ?? null,
+            'check_out'   => $validated['check_out'] ?? null,
+            'status'      => $validated['status'],
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم تسجيل الحضور بنجاح.");
+    }
+
+    public function hrUpdateLeaveStatus($id, Request $request)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:approved,rejected,paid',
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('leave_requests')->where('id', $id)->update([
+            'status'      => $validated['status'],
+            'reviewed_at' => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم تحديث حالة الطلب بنجاح.");
+    }
+
+    public function hrCreateLeaveRequest(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|string',
+            'leave_type'  => 'required|string',
+            'start_date'  => 'required|date',
+            'end_date'    => 'required|date',
+            'reason'      => 'nullable|string',
+        ]);
+
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('leave_requests')->insert([
+            'id'          => $uuid,
+            'employee_id' => $validated['employee_id'],
+            'leave_type'  => $validated['leave_type'],
+            'start_date'  => $validated['start_date'],
+            'end_date'    => $validated['end_date'],
+            'reason'      => $validated['reason'] ?? '',
+            'status'      => 'pending',
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم تقديم الطلب بنجاح وهو قيد المراجعة.");
+    }
+
+    public function hrCreatePayroll(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id'         => 'required|string',
+            'pay_period_year'     => 'required|integer',
+            'pay_period_month'    => 'required|integer',
+            'basic_salary'        => 'required|numeric|min:0',
+            'housing_allowance'   => 'nullable|numeric|min:0',
+            'transport_allowance' => 'nullable|numeric|min:0',
+            'other_deductions'    => 'nullable|numeric|min:0',
+        ]);
+
+        $basic = (float) $validated['basic_salary'];
+        $allowances = (float) ($validated['housing_allowance'] ?? 0) + (float) ($validated['transport_allowance'] ?? 0);
+        $deductions = (float) ($validated['other_deductions'] ?? 0);
+        $gross = $basic + $allowances;
+        $net = max(0, $gross - $deductions);
+
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('payroll')->insert([
+            'id'                  => $uuid,
+            'employee_id'         => $validated['employee_id'],
+            'pay_period_year'     => $validated['pay_period_year'],
+            'pay_period_month'    => $validated['pay_period_month'],
+            'basic_salary'        => $basic,
+            'housing_allowance'   => $validated['housing_allowance'] ?? 0,
+            'transport_allowance' => $validated['transport_allowance'] ?? 0,
+            'gross_salary'        => $gross,
+            'other_deductions'    => $deductions,
+            'net_salary'          => $net,
+            'status'              => 'pending',
+            'created_at'          => now(),
+            'updated_at'          => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم إصدار مسير الراتب بنجاح.");
+    }
+
+    public function hrCreateCustody(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:191',
+            'code' => 'required|string|max:50',
+            'type' => 'required|string|max:100',
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('custodies')->insert([
+            'name'       => $validated['name'],
+            'code'       => $validated['code'],
+            'type'       => $validated['type'],
+            'status'     => 'available',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تمت إضافة العهدة بنجاح.");
+    }
+
+    public function hrCreateTask(Request $request)
+    {
+        $validated = $request->validate([
+            'title'       => 'required|string|max:191',
+            'employee_id' => 'nullable|string',
+            'priority'    => 'required|in:low,medium,high,urgent',
+            'due_date'    => 'nullable|date',
+            'description' => 'nullable|string',
+        ]);
+
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('tasks')->insert([
+            'id'          => $uuid,
+            'title'       => $validated['title'],
+            'employee_id' => $validated['employee_id'] ?? null,
+            'priority'    => $validated['priority'],
+            'due_date'    => $validated['due_date'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'status'      => 'pending',
+            'created_by'  => auth()->id() ?? 1,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم إنشاء المهمة بنجاح.");
+    }
+
+    public function hrUpdateTaskStatus($id, Request $request)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:pending,in_progress,completed,cancelled',
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('tasks')->where('id', $id)->update([
+            'status'       => $validated['status'],
+            'completed_at' => $validated['status'] === 'completed' ? now() : null,
+            'updated_at'   => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم تحديث حالة المهمة بنجاح.");
+    }
+
+    public function hrCreateEntitlement(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|string',
+            'type'        => 'required|in:bonus,deduction,allowance,advance',
+            'title'       => 'required|string|max:191',
+            'amount'      => 'required|numeric|min:0.01',
+            'date'        => 'required|date',
+            'reason'      => 'nullable|string',
+        ]);
+
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('entitlements')->insert([
+            'id'          => $uuid,
+            'employee_id' => $validated['employee_id'],
+            'type'        => $validated['type'],
+            'title'       => $validated['title'],
+            'amount'      => $validated['amount'],
+            'date'        => $validated['date'],
+            'reason'      => $validated['reason'] ?? '',
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return $this->redirectBackWithTab($request, "تم تسجيل المستحق / الخصم بنجاح.");
+    }
+}

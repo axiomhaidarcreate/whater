@@ -406,6 +406,12 @@
                         <td class="lbl">معتمد الأمر:</td>
                         <td class="val">{{ $po->approver?->name ?? 'في انتظار الاعتماد' }}</td>
                     </tr>
+                    @if($po->vendor_invoice_number)
+                    <tr>
+                        <td class="lbl">رقم فاتورة المورد:</td>
+                        <td class="val num">{{ $po->vendor_invoice_number }}</td>
+                    </tr>
+                    @endif
                     <tr>
                         <td class="lbl">شروط الدفع:</td>
                         <td class="val">آجل 30 يوماً بعد الفحص المخزني</td>
@@ -454,19 +460,30 @@
         </table>
 
         <!-- Totals -->
+        @php
+            $subtotal = (float) $po->total_amount;
+            $taxAmount = $po->tax_amount !== null ? (float)$po->tax_amount : round($subtotal * 0.15, 2);
+            $taxRate = $subtotal > 0 ? round(($taxAmount / $subtotal) * 100, 1) : 15;
+            $grandTotal = $subtotal + $taxAmount;
+            $totalOrderedQty = $po->items->sum('ordered_qty');
+        @endphp
         <div class="totals-section">
             <table class="totals-table">
                 <tr>
-                    <td class="t-lbl">المجموع قبل الضريبة:</td>
-                    <td class="t-val num">{{ number_format($po->total_amount, 2) }} ر.س</td>
+                    <td class="t-lbl">إجمالي الكميات:</td>
+                    <td class="t-val num">{{ number_format($totalOrderedQty) }} قطعة</td>
                 </tr>
                 <tr>
-                    <td class="t-lbl">ضريبة القيمة المضافة (15%):</td>
-                    <td class="t-val num">{{ number_format($po->total_amount * 0.15, 2) }} ر.س</td>
+                    <td class="t-lbl">المجموع قبل الضريبة:</td>
+                    <td class="t-val num">{{ number_format($subtotal, 2) }} ر.س</td>
+                </tr>
+                <tr>
+                    <td class="t-lbl">ضريبة القيمة المضافة ({{ $taxRate }}%):</td>
+                    <td class="t-val num">{{ number_format($taxAmount, 2) }} ر.س</td>
                 </tr>
                 <tr class="grand-total-box">
                     <td class="t-lbl" style="color: #fff; font-weight: 800;">الإجمالي الكلي المعتمد:</td>
-                    <td class="t-val num" style="color: #fff; font-weight: 800;">{{ number_format($po->total_amount * 1.15, 2) }} ر.س</td>
+                    <td class="t-val num" style="color: #fff; font-weight: 800;">{{ number_format($grandTotal, 2) }} ر.س</td>
                 </tr>
             </table>
         </div>

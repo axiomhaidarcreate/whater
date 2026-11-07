@@ -266,4 +266,128 @@ class InventoryAndProcurementTest extends TestCase
                 'error_code' => 'FORBIDDEN',
             ]);
     }
+
+    public function test_accountant_can_create_purchase_order_with_tax_and_print_flow(): void
+    {
+        $accountant = User::where('phone', '0500000006')->first(); // accountant
+        $product = Product::first();
+        $warehouse = Warehouse::first();
+        $supplier = Supplier::first();
+
+        $response = $this->actingAs($accountant)->post('/procurement/orders/create', [
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'order_date' => now()->toDateString(),
+            'vendor_invoice_number' => 'INV-SUP-8877',
+            'tax_percent' => 15,
+            'tax_amount' => 150.00,
+            'action' => 'save_and_print',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 10,
+                    'unit_price' => 100.00,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $response->assertSessionHas('print_po_url');
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'total_amount' => 1000.00,
+            'tax_amount' => 150.00,
+            'vendor_invoice_number' => 'INV-SUP-8877',
+        ]);
+    }
+
+    public function test_can_create_supplier_via_ajax_inline(): void
+    {
+        $accountant = User::where('phone', '0500000006')->first();
+
+        $response = $this->actingAs($accountant)
+            ->withHeader('Accept', 'application/json')
+            ->post('/suppliers/create', [
+                'name' => 'مؤسسة التوريدات المائية الحديثة',
+                'phone' => '0599112233',
+                'tax_number' => '310998877665543',
+                'contact_person' => 'المهندس طارق',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $this->assertDatabaseHas('suppliers', [
+            'name' => 'مؤسسة التوريدات المائية الحديثة',
+            'phone' => '0599112233',
+        ]);
+    }
+
+    public function test_can_create_product_via_ajax_inline(): void
+    {
+        $accountant = User::where('phone', '0500000006')->first();
+
+        $response = $this->actingAs($accountant)
+            ->withHeader('Accept', 'application/json')
+            ->post('/products/create', [
+                'name_ar' => 'فلتر شوائب قطني 5 ميكرون فائق الجودة',
+                'sku' => 'FLT-SED-PREMIUM',
+                'type' => 'filter_cartridge',
+                'cost_price' => 12.50,
+                'selling_price' => 25.00,
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $this->assertDatabaseHas('products', [
+            'name_ar' => 'فلتر شوائب قطني 5 ميكرون فائق الجودة',
+            'sku' => 'FLT-SED-PREMIUM',
+            'cost_price' => 12.50,
+        ]);
+    }
+
+    public function test_purchase_order_print_view_displays_tax_and_totals(): void
+    {
+        $accountant = User::where('phone', '0500000006')->first();
+        $supplier = Supplier::first();
+        $warehouse = Warehouse::first();
+        $product = Product::first();
+
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-TEST-0099',
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'status' => 'draft',
+            'total_amount' => 500.00,
+            'tax_amount' => 75.00,
+            'vendor_invoice_number' => 'INV-TEST-44',
+            'order_date' => now()->toDateString(),
+            'created_by' => $accountant->id,
+        ]);
+
+        $po->items()->create([
+            'product_id' => $product->id,
+            'ordered_qty' => 5,
+            'received_qty' => 0,
+            'unit_price' => 100.00,
+            'tax_percent' => 15.00,
+            'total_price' => 500.00,
+        ]);
+
+        $response = $this->actingAs($accountant)->get("/procurement/orders/{$po->id}/print");
+        $response->assertStatus(200);
+        $response->assertSee('PO-TEST-0099');
+        $response->assertSee('INV-TEST-44');
+        $response->assertSee('500.00');
+        $response->assertSee('75.00');
+        $response->assertSee('575.00');
+    }
 }

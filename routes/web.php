@@ -71,6 +71,38 @@ Route::delete('/admin/roles/{role}', [DashboardController::class, 'deleteRole'])
 Route::post('/admin/roles/{role}/permissions', [DashboardController::class, 'updateRolePermissions'])->name('admin.roles.permissions');
 Route::post('/admin/permissions/create', [DashboardController::class, 'createPermission'])->name('admin.permissions.create');
 
-// إعدادات النظام (الألوان، الشركة، التشغيل)
+// إعدادات النظام (الألوان، الشركة، التشغيل) وتحديث النظام
 Route::post('/admin/settings/update', [DashboardController::class, 'updateSettings'])->name('admin.settings.update');
 Route::post('/admin/reset-demo-data', [DashboardController::class, 'resetDemoData'])->name('admin.reset-demo');
+Route::post('/admin/system-update', [DashboardController::class, 'systemUpdate'])->name('admin.system.update');
+Route::match(['get', 'post'], '/deploy-webhook', [DashboardController::class, 'deployWebhook'])->name('deploy.webhook');
+
+// شاشة الأصناف (Products Management)
+Route::post('/products/create', [DashboardController::class, 'createProduct'])->name('products.create');
+Route::post('/products/{product}/update', [DashboardController::class, 'updateProduct'])->name('products.update');
+Route::delete('/products/{product}/delete', [DashboardController::class, 'deleteProduct'])->name('products.delete');
+Route::get('/products/{product}/print', [DashboardController::class, 'printProduct'])->name('products.print');
+
+// حذف أوامر الشراء
+Route::delete('/procurement/orders/{po}/delete', [DashboardController::class, 'deletePurchaseOrder'])->name('procurement.orders.delete');
+
+// تتبع الفنيين - Technician Field Tracking
+Route::get('/technician/trips', [DashboardController::class, 'getTechnicianTrips'])->name('technician.trips.index');
+Route::post('/technician/trips/create', [DashboardController::class, 'createTechnicianTrip'])->name('technician.trips.create');
+Route::post('/technician/trips/{trip}/update', [DashboardController::class, 'updateTechnicianTrip'])->name('technician.trips.update');
+Route::post('/technician/trips/{trip}/return', [DashboardController::class, 'markTechnicianReturned'])->name('technician.trips.return');
+Route::delete('/technician/trips/{trip}/delete', [DashboardController::class, 'deleteTechnicianTrip'])->name('technician.trips.delete');
+
+// ============================================================
+// الموارد البشرية - Human Resources (HR)
+// ============================================================
+Route::post('/hr/employees/create', [DashboardController::class, 'hrCreateEmployee'])->name('hr.employees.create');
+Route::delete('/hr/employees/{id}/delete', [DashboardController::class, 'hrDeleteEmployee'])->name('hr.employees.delete');
+Route::post('/hr/attendance/record', [DashboardController::class, 'hrRecordAttendance'])->name('hr.attendance.record');
+Route::post('/hr/requests/{id}/status', [DashboardController::class, 'hrUpdateLeaveStatus'])->name('hr.requests.status');
+Route::post('/hr/requests/create', [DashboardController::class, 'hrCreateLeaveRequest'])->name('hr.requests.create');
+Route::post('/hr/payroll/create', [DashboardController::class, 'hrCreatePayroll'])->name('hr.payroll.create');
+Route::post('/hr/custodies/create', [DashboardController::class, 'hrCreateCustody'])->name('hr.custodies.create');
+Route::post('/hr/tasks/create', [DashboardController::class, 'hrCreateTask'])->name('hr.tasks.create');
+Route::post('/hr/tasks/{id}/status', [DashboardController::class, 'hrUpdateTaskStatus'])->name('hr.tasks.status');
+Route::post('/hr/entitlements/create', [DashboardController::class, 'hrCreateEntitlement'])->name('hr.entitlements.create');

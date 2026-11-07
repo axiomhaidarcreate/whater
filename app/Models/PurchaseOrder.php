@@ -17,8 +17,11 @@ class PurchaseOrder extends Model
         'warehouse_id',
         'status',
         'total_amount',
+        'tax_amount',
         'order_date',
         'notes',
+        'vendor_invoice_number',
+        'attachment_path',
         'created_by',
         'approved_by',
     ];

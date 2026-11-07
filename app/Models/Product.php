@@ -18,6 +18,7 @@ class Product extends Model
         'name_ar',
         'name_en',
         'type',
+        'is_compound',
         'unit',
         'cost_price',
         'selling_price',
@@ -33,6 +34,7 @@ class Product extends Model
             'selling_price' => 'decimal:4',
             'reorder_level' => 'integer',
             'is_active' => 'boolean',
+            'is_compound' => 'boolean',
         ];
     }
 

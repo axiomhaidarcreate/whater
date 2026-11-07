@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <!-- Leaflet Interactive Maps (Google-like Map Tracking) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <title>تقنية الفلاتر | نظام إدارة الموارد المؤسسية (ERP) ولوحة التحكم المركزية</title>
     <!-- Google Fonts: Cairo & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1250,7 +1254,29 @@
                 </button>
                 @endif
 
+                                <!-- بوابة الموارد البشرية -->
+                @if($isSuperAdmin || $isSystemAdmin || $isGeneralMgr || ($isHrManager ?? false))
+                <button class="nav-link" onclick="switchNavTab('hr', this)">
+                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span>الموارد البشرية</span>
+                    <span class="nav-badge" style="background:#10b981;color:#fff;">{{ count($hrEmployees ?? []) }}</span>
+                </button>
+                @endif
+
+                @if($isSuperAdmin || $isSystemAdmin)
+                <button class="nav-link" onclick="switchNavTab('tech-trips', this)">
+                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>&#x062A;&#x062A;&#x0628;&#x0639; &#x0627;&#x0644;&#x0641;&#x0646;&#x064A;&#x064A;&#x0646;</span>
+                    <span class="nav-badge" style="background:#f59e0b;color:#000;">{{ count($technicianTrips ?? []) }}</span>
+                </button>
+                @endif
+
                 @if($isSuperAdmin || $isAccountant)
+                <button class="nav-link" onclick="switchNavTab('products', this)">
+                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <span>الأصناف</span>
+                    <span class="nav-badge">{{ count($allProducts) }}</span>
+                </button>
                 <button class="nav-link" onclick="switchNavTab('invoices', this)">
                     <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
                     <span>دفتر الفواتير والتحصيل</span>
@@ -1354,6 +1380,11 @@
                 @if(session('print_invoice_id'))
                 <a href="{{ route('invoices.print', session('print_invoice_id')) }}" target="_blank" class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
                     🖨️ طباعة الفاتورة الآن PDF
+                </a>
+                @endif
+                @if(session('print_po_url'))
+                <a href="{{ session('print_po_url') }}" target="_blank" class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: linear-gradient(135deg, #0284c7, #0369a1);">
+                    🖨️ طباعة أمر الشراء الآن (PDF)
                 </a>
                 @endif
             </div>
@@ -2464,6 +2495,25 @@
                     <button class="sub-pill" onclick="switchSalesSubTab('orders', this)">أوامر البيع وعروض الأسعار ({{ count($salesOrders) }})</button>
                 </div>
 
+                <!-- شريط فلاتر البحث لشاشة المبيعات (رقم الفاتورة / رقم العميل أو اسمه) -->
+                <div class="glass" style="padding: 0.85rem 1.25rem; margin-bottom: 1.2rem; border-radius: 12px; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #10b981; font-size: 13px;">
+                        <span>🔍 فلاتر بحث المبيعات:</span>
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                        <input type="text" id="salesSearchInvoiceNo" class="form-control" placeholder="بحث برقم الفاتورة (مثال: INV-2026-0001)..." oninput="filterSalesInvoicesTable()" style="font-size: 12.5px;">
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                        <input type="text" id="salesSearchCustomer" class="form-control" placeholder="بحث برقم جوال العميل أو اسمه (مثال: 05...)..." oninput="filterSalesInvoicesTable()" style="font-size: 12.5px;">
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline" onclick="resetSalesInvoiceFilter()" style="padding: 0.45rem 1rem; font-size: 12px;">
+                            إعادة تعيين الفلتر
+                        </button>
+                    </div>
+                    <div id="salesFilterCount" style="font-size: 12px; color: var(--text-muted); font-weight: 600;"></div>
+                </div>
+
                 <!-- SUB-PANE 1: TAX INVOICES -->
                 <div id="sales-sub-invoices" class="glass table-card">
                     <div class="table-responsive">
@@ -2571,6 +2621,1935 @@
                 </div>
             </div>
 
+                                    <!-- ================= TAB: HUMAN RESOURCES (بوابة الموارد البشرية) ================= -->
+            <div id="tab-hr" class="tab-pane">
+                
+                <style>
+                    .hr-portal-card {
+                        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    .hr-portal-card:hover {
+                        transform: translateY(-6px);
+                        border-color: rgba(255, 255, 255, 0.35) !important;
+                        background: #253041 !important;
+                        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45) !important;
+                    }
+                    .hr-sub-nav-btn {
+                        padding: 0.45rem 0.9rem;
+                        border-radius: 8px;
+                        font-size: 0.82rem;
+                        font-weight: 700;
+                        border: 1px solid #e2e8f0;
+                        background: #ffffff;
+                        color: #475569;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.4rem;
+                        transition: all 0.2s ease;
+                        font-family: inherit;
+                    }
+                    .hr-sub-nav-btn:hover {
+                        background: #f1f5f9;
+                        color: #1e293b;
+                    }
+                    .hr-sub-nav-btn.active {
+                        background: #1e7e6a;
+                        color: #ffffff;
+                        border-color: #1e7e6a;
+                        box-shadow: 0 2px 8px rgba(30, 126, 106, 0.25);
+                    }
+                    .hr-kpi-badge {
+                        font-size: 0.72rem;
+                        padding: 2px 7px;
+                        border-radius: 10px;
+                        font-weight: 700;
+                    }
+                </style>
+
+                <!-- ================= SCREEN 1: PORTAL GATEWAY (بوابة الموارد البشرية) ================= -->
+                <div id="hrPortalHub" style="background: #111827; border-radius: 20px; padding: 3.5rem 2rem; color: #fff; box-shadow: 0 12px 40px rgba(0,0,0,0.3); text-align: center; margin-bottom: 2rem;">
+                    
+                    <!-- Header with Portal Title & Subtitle -->
+                    <div style="margin-bottom: 3rem;">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 0.6rem;">
+                            <div style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 2px dashed #f59e0b; border-radius: 14px; color: #fbbf24; font-size: 1.5rem; background: rgba(245, 158, 11, 0.1);">
+                                👥
+                            </div>
+                            <h1 style="font-size: 2.3rem; font-weight: 900; color: #ffffff; margin: 0; letter-spacing: -0.5px;">بوابة الموارد البشرية</h1>
+                        </div>
+                        <p style="color: #94a3b8; font-size: 1.1rem; margin: 0; font-weight: 500;">اختر القسم الذي تريد إدارته</p>
+                    </div>
+
+                    <!-- 3x3 Card Grid matching image -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.75rem; max-width: 1050px; margin: 0 auto; text-align: center;">
+                        
+                        <!-- Card 1: الرئيسية -->
+                        <div onclick="switchHrSubView('overview')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #352a16; color: #f59e0b; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(245, 158, 11, 0.3);">
+                                📈
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">الرئيسية</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">لوحة المؤشرات والملخص</span>
+                        </div>
+
+                        <!-- Card 2: الموظفين -->
+                        <div onclick="switchHrSubView('employees')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #163325; color: #10b981; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(16, 185, 129, 0.3);">
+                                👥
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">الموظفين</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">إدارة الكادر والملفات ({{ count($hrEmployees ?? []) }})</span>
+                        </div>
+
+                        <!-- Card 3: الحضور والانصراف -->
+                        <div onclick="switchHrSubView('attendance')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #172a45; color: #3b82f6; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(59, 130, 246, 0.3);">
+                                🕒
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">الحضور والانصراف</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">متابعة البصمة وساعات الدوام</span>
+                        </div>
+
+                        <!-- Card 4: الرواتب -->
+                        <div onclick="switchHrSubView('payroll')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #382c16; color: #f59e0b; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(245, 158, 11, 0.3);">
+                                💵
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">الرواتب</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">مسيرات الرواتب والتحويلات</span>
+                        </div>
+
+                        <!-- Card 5: الطلبات -->
+                        <div onclick="switchHrSubView('requests')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #391c30; color: #ec4899; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(236, 72, 153, 0.3);">
+                                ✉️
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">الطلبات</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">إجازات وسلف واستئذان ({{ count($hrLeaveRequests ?? []) }})</span>
+                        </div>
+
+                        <!-- Card 6: المستحقات -->
+                        <div onclick="switchHrSubView('entitlements')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #2d1d44; color: #a855f7; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(168, 85, 247, 0.3);">
+                                📄
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">المستحقات</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">المكافآت والخصومات والبدلات</span>
+                        </div>
+
+                        <!-- Card 7: العهد -->
+                        <div onclick="switchHrSubView('custodies')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #232d3d; color: #94a3b8; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(148, 163, 184, 0.3);">
+                                📦
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">العهد</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">أصول الشركة والسيارات المسلمة</span>
+                        </div>
+
+                        <!-- Card 8: المهام -->
+                        <div onclick="switchHrSubView('tasks')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #3b1d22; color: #ef4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(239, 68, 68, 0.3);">
+                                📋
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">المهام</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">متابعة تكليفات العمل اليومية ({{ count($hrTasks ?? []) }})</span>
+                        </div>
+
+                        <!-- Card 9: التقارير -->
+                        <div onclick="switchHrSubView('reports')" class="hr-portal-card" style="background: #1f2937; border: 1px solid #374151; border-radius: 18px; padding: 2.5rem 1.5rem; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; border-radius: 50%; background: #19323a; color: #06b6d4; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 1.7rem; border: 2px solid rgba(6, 182, 212, 0.3);">
+                                📊
+                            </div>
+                            <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0 0 0.4rem;">التقارير</h3>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">تحليلات الموظفين والمصروفات</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ================= SCREEN 2: DEPARTMENT SUB-VIEWS CONTAINER ================= -->
+                <div id="hrSubViewsContainer" style="display: none;">
+                    
+                    <!-- Top Navigation Bar & Return to Portal Button -->
+                    <div style="background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button type="button" onclick="returnToHrPortal()" style="background: #111827; color: #ffffff; border: none; padding: 0.5rem 1.1rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; font-family: inherit;">
+                                <span>⬅️</span>
+                                <span>بوابة الموارد البشرية</span>
+                            </button>
+                            <span style="color: #cbd5e1;">|</span>
+                            <h3 id="hrCurrentSectionTitle" style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #1e293b; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                <!-- Dynamic Title -->
+                            </h3>
+                        </div>
+
+                        <!-- Quick Navigation Pills -->
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            <button type="button" class="hr-sub-nav-btn" data-view="overview" onclick="switchHrSubView('overview')">📈 الرئيسية</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="employees" onclick="switchHrSubView('employees')">👥 الموظفين</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="attendance" onclick="switchHrSubView('attendance')">🕒 الحضور</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="payroll" onclick="switchHrSubView('payroll')">💵 الرواتب</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="requests" onclick="switchHrSubView('requests')">✉️ الطلبات</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="entitlements" onclick="switchHrSubView('entitlements')">📄 المستحقات</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="custodies" onclick="switchHrSubView('custodies')">📦 العهد</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="tasks" onclick="switchHrSubView('tasks')">📋 المهام</button>
+                            <button type="button" class="hr-sub-nav-btn" data-view="reports" onclick="switchHrSubView('reports')">📊 التقارير</button>
+                        </div>
+                    </div>
+
+                    <!-- 1. SUB-VIEW: OVERVIEW (الرئيسية) -->
+                    <div id="hr-sub-overview" class="hr-sub-pane" style="display: none;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                            <div style="background: #fff; border-radius: 14px; padding: 1.2rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">👥</div>
+                                <div>
+                                    <div style="font-size: 0.78rem; color: #64748b; font-weight: 600;">إجمالي الموظفين</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #1e293b;">{{ $hrKpis['total_employees'] ?? count($hrEmployees ?? []) }}</div>
+                                </div>
+                            </div>
+                            <div style="background: #fff; border-radius: 14px; padding: 1.2rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🕒</div>
+                                <div>
+                                    <div style="font-size: 0.78rem; color: #64748b; font-weight: 600;">حضور اليوم</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #1e293b;">{{ $hrKpis['today_attendance'] ?? 0 }}</div>
+                                </div>
+                            </div>
+                            <div style="background: #fff; border-radius: 14px; padding: 1.2rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: #fdf2f8; color: #db2777; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">✉️</div>
+                                <div>
+                                    <div style="font-size: 0.78rem; color: #64748b; font-weight: 600;">طلبات معلقة</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #1e293b;">{{ $hrKpis['pending_requests'] ?? 0 }}</div>
+                                </div>
+                            </div>
+                            <div style="background: #fff; border-radius: 14px; padding: 1.2rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">💵</div>
+                                <div>
+                                    <div style="font-size: 0.78rem; color: #64748b; font-weight: 600;">إجمالي الرواتب</div>
+                                    <div style="font-size: 1.3rem; font-weight: 800; color: #1e293b;">{{ number_format($hrKpis['total_payroll'] ?? 0, 2) }} <span style="font-size:0.75rem;">ر.س</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Overview Tables (Latest attendance & Recent tasks) -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                            <div class="card" style="padding: 1.25rem;">
+                                <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem;">🕒 آخر تسجيلات الحضور</h3>
+                                <div class="table-wrap">
+                                    <table>
+                                        <thead><tr><th>الموظف</th><th>التاريخ</th><th>الدخول</th><th>الحالة</th></tr></thead>
+                                        <tbody>
+                                            @forelse(collect($hrAttendance ?? [])->take(5) as $att)
+                                            <tr>
+                                                <td><strong>{{ $att->emp_name ?? 'موظف' }}</strong></td>
+                                                <td>{{ $att->work_date }}</td>
+                                                <td>{{ $att->check_in ?? '--' }}</td>
+                                                <td><span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;">{{ $att->status }}</span></td>
+                                            </tr>
+                                            @empty
+                                            <tr><td colspan="4" style="text-align:center;color:#94a3b8;">لا توجد سجلات بعد</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="card" style="padding: 1.25rem;">
+                                <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem;">📋 المهام والتكليفات الحديثة</h3>
+                                <div class="table-wrap">
+                                    <table>
+                                        <thead><tr><th>المهمة</th><th>الموظف</th><th>الأولوية</th><th>الحالة</th></tr></thead>
+                                        <tbody>
+                                            @forelse(collect($hrTasks ?? [])->take(5) as $tsk)
+                                            <tr>
+                                                <td><strong>{{ $tsk->title }}</strong></td>
+                                                <td>{{ $tsk->emp_name ?? 'غير محدد' }}</td>
+                                                <td><span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;">{{ $tsk->priority }}</span></td>
+                                                <td>{{ $tsk->status }}</td>
+                                            </tr>
+                                            @empty
+                                            <tr><td colspan="4" style="text-align:center;color:#94a3b8;">لا توجد مهام مسجلة</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. SUB-VIEW: EMPLOYEES (الموظفين) -->
+                    <div id="hr-sub-employees" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">إدارة سجلات الموظفين</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">عرض وتعديل وإضافة موظفي المنشأة وبياناتهم التعاقدية</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrNewEmployeeModal')">
+                                + إضافة موظف جديد
+                            </button>
+                        </div>
+
+                        <!-- Search Bar -->
+                        <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+                            <input type="text" id="hrEmpSearchInput" oninput="filterHrEmployeesTable()" placeholder="🔍 ابحث بالاسم، الكود، المسمى، أو رقم الهاتف..." class="form-control" style="max-width: 450px;">
+                        </div>
+
+                        <!-- Employees Table -->
+                        <div class="table-wrap">
+                            <table id="hrEmployeesTable">
+                                <thead>
+                                    <tr>
+                                        <th>الكود</th>
+                                        <th>اسم الموظف / الحساب</th>
+                                        <th>الدور والصلاحية في نظام الفلاتر</th>
+                                        <th>رقم الجوال</th>
+                                        <th>رقم الهوية / الإقامة</th>
+                                        <th>الراتب الأساسي</th>
+                                        <th>تاريخ التعيين</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrEmployees ?? [] as $emp)
+                                    <tr data-emp-text="{{ strtolower($emp->full_name . ' ' . $emp->employee_code . ' ' . ($emp->role_display_name ?? $emp->job_title_ar ?? '') . ' ' . ($emp->phone ?? '') . ' ' . ($emp->user_email ?? $emp->email ?? '')) }}">
+                                        <td><span style="font-family:monospace;font-weight:700;color:#0284c7;">#{{ $emp->employee_code }}</span></td>
+                                        <td>
+                                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                                <div style="width:34px;height:34px;border-radius:50%;background:#1e7e6a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem;">
+                                                    {{ mb_substr($emp->full_name, 0, 1) }}
+                                                </div>
+                                                <div>
+                                                    <strong style="color:#1e293b;">{{ $emp->full_name }}</strong>
+                                                    @if(!empty($emp->user_email ?? $emp->email))
+                                                    <div style="font-size:0.75rem;color:#64748b;direction:ltr;text-align:right;">{{ $emp->user_email ?? $emp->email }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @php
+                                                $roleColors = [
+                                                    'super_admin'            => ['#fef3c7', '#d97706', '👑'],
+                                                    'general_manager'        => ['#f3e8ff', '#7c3aed', '👔'],
+                                                    'maintenance_supervisor' => ['#e0f2fe', '#0369a1', '🛠️'],
+                                                    'technician'             => ['#dcfce7', '#15803d', '🔧'],
+                                                    'call_center'            => ['#fce7f3', '#be185d', '🎧'],
+                                                    'accountant'             => ['#ffedd5', '#c2410c', '💼'],
+                                                    'warehouse_keeper'       => ['#f1f5f9', '#475569', '📦'],
+                                                    'hr_manager'             => ['#ecfdf5', '#047857', '👥'],
+                                                    'sales_rep'              => ['#e0e7ff', '#4338ca', '🛍️'],
+                                                    'sales_manager'          => ['#ede9fe', '#6d28d9', '📊'],
+                                                    'system_admin'           => ['#fef2f2', '#b91c1c', '⚙️'],
+                                                ];
+                                                $rCode = $emp->role_name ?? 'staff';
+                                                $rConf = $roleColors[$rCode] ?? ['#f1f5f9', '#334155', '👤'];
+                                                $rLabel = $emp->role_display_name ?? $emp->job_title_ar ?? $emp->job_title ?? 'موظف';
+                                            @endphp
+                                            <span style="background:{{ $rConf[0] }};color:{{ $rConf[1] }};padding:3px 10px;border-radius:12px;font-size:0.8rem;font-weight:700;display:inline-flex;align-items:center;gap:0.35rem;">
+                                                <span>{{ $rConf[2] }}</span>
+                                                <span>{{ $rLabel }}</span>
+                                            </span>
+                                        </td>
+                                        <td>{{ $emp->phone ?? '-' }}</td>
+                                        <td>{{ $emp->national_id ?? '-' }}</td>
+                                        <td><strong>{{ number_format((float)($emp->base_salary ?? 0), 2) }} ر.س</strong></td>
+                                        <td>{{ $emp->hire_date ?? '-' }}</td>
+                                        <td>
+                                            @if($emp->is_active)
+                                            <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">نشط</span>
+                                            @else
+                                            <span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">متوقف</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <form action="{{ route('hr.employees.delete', $emp->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا الموظف وحسابه؟');" style="display:inline;">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" style="background:#fee2e2;color:#ef4444;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:600;">🗑️ حذف</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="9" style="text-align:center;padding:2rem;color:#94a3b8;">لا يوجد موظفون مسجلون حالياً</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 3. SUB-VIEW: ATTENDANCE (الحضور والانصراف) -->
+                    <div id="hr-sub-attendance" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">سجلات الحضور والانصراف</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">متابعة أوقات تسجيل الدخول والخروج والتأخيرات</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrAttendanceModal')">
+                                + تسجيل حضور يدوي
+                            </button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الموظف</th>
+                                        <th>التاريخ</th>
+                                        <th>وقت الدخول</th>
+                                        <th>وقت الخروج</th>
+                                        <th>دقائق التأخير</th>
+                                        <th>ساعات إضافية</th>
+                                        <th>الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrAttendance ?? [] as $att)
+                                    <tr>
+                                        <td><strong>{{ $att->emp_name ?? 'موظف' }}</strong></td>
+                                        <td>{{ $att->work_date }}</td>
+                                        <td>{{ $att->check_in ?? '--' }}</td>
+                                        <td>{{ $att->check_out ?? '--' }}</td>
+                                        <td>{{ $att->delay_minutes ? $att->delay_minutes . ' دقيقة' : '0' }}</td>
+                                        <td>{{ $att->overtime_hours ? $att->overtime_hours . ' س' : '0' }}</td>
+                                        <td>
+                                            @php
+                                                $attColors = ['present'=>'#10b981','absent'=>'#ef4444','late'=>'#f59e0b','excused'=>'#6366f1'];
+                                                $attLabels = ['present'=>'حاضر','absent'=>'غائب','late'=>'متأخر','excused'=>'مستأذن'];
+                                            @endphp
+                                            <span style="background:{{ $attColors[$att->status] ?? '#6b7280' }};color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">
+                                                {{ $attLabels[$att->status] ?? $att->status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">لا توجد سجلات حضور مسجلة</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 4. SUB-VIEW: PAYROLL (الرواتب) -->
+                    <div id="hr-sub-payroll" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">مسيرات الرواتب والمستحقات المالية</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">إصدار ومتابعة رواتب الكادر والبدلات والخصومات</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrPayrollModal')">
+                                + إصدار مسير راتب
+                            </button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الموظف</th>
+                                        <th>فترة الراتب</th>
+                                        <th>الراتب الأساسي</th>
+                                        <th>بدل سكن</th>
+                                        <th>بدل مواصلات</th>
+                                        <th>إجمالي الخصومات</th>
+                                        <th>صافي الراتب المستحق</th>
+                                        <th>الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrPayrolls ?? [] as $pay)
+                                    <tr>
+                                        <td><strong>{{ $pay->emp_name ?? 'موظف' }}</strong></td>
+                                        <td>{{ $pay->pay_period_month }} / {{ $pay->pay_period_year }}</td>
+                                        <td>{{ number_format((float)$pay->basic_salary, 2) }} ر.س</td>
+                                        <td>{{ number_format((float)$pay->housing_allowance, 2) }} ر.س</td>
+                                        <td>{{ number_format((float)$pay->transport_allowance, 2) }} ر.س</td>
+                                        <td style="color:#ef4444;">{{ number_format((float)$pay->other_deductions, 2) }} ر.س</td>
+                                        <td><strong style="color:#10b981;font-size:1.05rem;">{{ number_format((float)$pay->net_salary, 2) }} ر.س</strong></td>
+                                        <td>
+                                            @if($pay->status === 'paid')
+                                            <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">مدفوع</span>
+                                            @else
+                                            <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">معلق</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="8" style="text-align:center;padding:2rem;color:#94a3b8;">لا توجد مسيرات رواتب مصدرة</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5. SUB-VIEW: REQUESTS (الطلبات) -->
+                    <div id="hr-sub-requests" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">طلبات الموظفين (إجازات، سلف، استئذان)</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">مراجعة وقبول أو رفض طلبات الكادر الوظيفي</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrNewRequestModal')">
+                                + تقديم طلب جديد
+                            </button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الموظف</th>
+                                        <th>نوع الطلب</th>
+                                        <th>من تاريخ</th>
+                                        <th>إلى تاريخ</th>
+                                        <th>السبب / التفاصيل</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراء والاعتماد</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrLeaveRequests ?? [] as $req)
+                                    <tr>
+                                        <td><strong>{{ $req->emp_name ?? 'موظف' }}</strong></td>
+                                        <td>
+                                            @php
+                                                $reqTypes = ['annual'=>'إجازة سنوية','sick'=>'إجازة مرضية','emergency'=>'إجازة اضطرارية','loan'=>'طلب سلفة','permission'=>'إذن انصراف'];
+                                            @endphp
+                                            <span style="font-weight:600;color:#0284c7;">{{ $reqTypes[$req->leave_type] ?? $req->leave_type }}</span>
+                                        </td>
+                                        <td>{{ $req->start_date }}</td>
+                                        <td>{{ $req->end_date }}</td>
+                                        <td style="max-width:200px;font-size:0.8rem;">{{ $req->reason ?? '-' }}</td>
+                                        <td>
+                                            @php
+                                                $reqStatusColors = ['approved'=>'#10b981','paid'=>'#10b981','rejected'=>'#ef4444','pending'=>'#f59e0b'];
+                                                $reqStatusLabels = ['approved'=>'مقبول','paid'=>'تم الصرف','rejected'=>'مرفوض','pending'=>'قيد الانتظار'];
+                                            @endphp
+                                            <span style="background:{{ $reqStatusColors[$req->status] ?? '#6b7280' }};color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">
+                                                {{ $reqStatusLabels[$req->status] ?? $req->status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if($req->status === 'pending')
+                                            <div style="display:flex;gap:0.3rem;">
+                                                <form action="{{ route('hr.requests.status', $req->id) }}" method="POST">
+                                                    @csrf
+                                                    <input type="hidden" name="status" value="approved">
+                                                    <button type="submit" style="background:#10b981;color:#fff;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:600;">✅ قبول</button>
+                                                </form>
+                                                <form action="{{ route('hr.requests.status', $req->id) }}" method="POST">
+                                                    @csrf
+                                                    <input type="hidden" name="status" value="rejected">
+                                                    <button type="submit" style="background:#ef4444;color:#fff;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:600;">❌ رفض</button>
+                                                </form>
+                                            </div>
+                                            @else
+                                            <span style="color:#94a3b8;font-size:0.75rem;">تمت المراجعة</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="7" style="text-align:center;padding:2rem;color:#94a3b8;">لا توجد طلبات مسجلة</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 6. SUB-VIEW: ENTITLEMENTS (المستحقات) -->
+                    <div id="hr-sub-entitlements" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">المستحقات والخصومات والمكافآت</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">تسجيل القيود المالية الفردية للموظفين</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrEntitlementModal')">
+                                + إضافة مستحق / خصم
+                            </button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الموظف</th>
+                                        <th>النوع</th>
+                                        <th>العنوان</th>
+                                        <th>المبلغ</th>
+                                        <th>التاريخ</th>
+                                        <th>السبب / البيان</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrEntitlements ?? [] as $ent)
+                                    <tr>
+                                        <td><strong>{{ $ent->emp_name ?? 'موظف' }}</strong></td>
+                                        <td>
+                                            @if($ent->type === 'bonus' || $ent->type === 'allowance')
+                                            <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">مكافأة / بدل</span>
+                                            @else
+                                            <span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">خصم / استقطاع</span>
+                                            @endif
+                                        </td>
+                                        <td><strong>{{ $ent->title }}</strong></td>
+                                        <td>{{ number_format((float)$ent->amount, 2) }} ر.س</td>
+                                        <td>{{ $ent->date }}</td>
+                                        <td style="font-size:0.8rem;color:#64748b;">{{ $ent->reason ?? '-' }}</td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">لا توجد قيود مستحقات</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 7. SUB-VIEW: CUSTODIES (العهد) -->
+                    <div id="hr-sub-custodies" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">إدارة العهد والأصول المسلمة</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">متابعة الأجهزة والسيارات والعهد العينية المسلمة للموظفين</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrCustodyModal')">
+                                + إضافة عهدة جديدة
+                            </button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>كود العهدة</th>
+                                        <th>اسم العهدة</th>
+                                        <th>النوع</th>
+                                        <th>الموظف المستلم حالياً</th>
+                                        <th>تاريخ التسليم</th>
+                                        <th>الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrCustodies ?? [] as $cust)
+                                    <tr>
+                                        <td><span style="font-family:monospace;font-weight:700;color:#0284c7;">{{ $cust->code }}</span></td>
+                                        <td><strong>{{ $cust->name }}</strong></td>
+                                        <td>{{ $cust->type }}</td>
+                                        <td>{{ $cust->emp_name ?? 'غير مسلمة لأحد' }}</td>
+                                        <td>{{ $cust->assigned_at ?? '-' }}</td>
+                                        <td>
+                                            @if($cust->status === 'assigned')
+                                            <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">مسلمة</span>
+                                            @else
+                                            <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;">متوفرة بالعهدة</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">لا توجد عهد مسجلة</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 8. SUB-VIEW: TASKS (المهام) -->
+                    <div id="hr-sub-tasks" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">متابعة وتكليف المهام</h3>
+                                <p style="font-size: 0.8rem; color: #64748b; margin: 0.2rem 0 0;">إسناد المهام الإدارية والميدانية وتتبع نسب الإنجاز</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="openModal('hrTaskModal')">
+                                + تكليف بمهمة جديدة
+                            </button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>عنوان المهمة</th>
+                                        <th>الموظف المكلف</th>
+                                        <th>الأولوية</th>
+                                        <th>تاريخ الاستحقاق</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($hrTasks ?? [] as $tsk)
+                                    <tr>
+                                        <td><strong>{{ $tsk->title }}</strong></td>
+                                        <td>{{ $tsk->emp_name ?? 'غير محدد' }}</td>
+                                        <td>
+                                            @php
+                                                $pColors = ['urgent'=>'#ef4444','high'=>'#f97316','medium'=>'#3b82f6','low'=>'#64748b'];
+                                            @endphp
+                                            <span style="background:{{ $pColors[$tsk->priority] ?? '#6b7280' }};color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">
+                                                {{ $tsk->priority }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $tsk->due_date ?? '-' }}</td>
+                                        <td>
+                                            @if($tsk->status === 'completed')
+                                            <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">مكتملة</span>
+                                            @else
+                                            <span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">{{ $tsk->status }}</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($tsk->status !== 'completed')
+                                            <form action="{{ route('hr.tasks.status', $tsk->id) }}" method="POST" style="display:inline;">
+                                                @csrf
+                                                <input type="hidden" name="status" value="completed">
+                                                <button type="submit" style="background:#10b981;color:#fff;border:none;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:600;">✅ إكمال</button>
+                                            </form>
+                                            @else
+                                            <span style="color:#10b981;font-size:0.75rem;font-weight:600;">أنجزت</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">لا توجد مهام مسجلة</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 9. SUB-VIEW: REPORTS (التقارير) -->
+                                        <!-- 9. SUB-VIEW: REPORTS (التقارير الشاملة المتصلة بالنظام) -->
+                    <div id="hr-sub-reports" class="hr-sub-pane" style="display: none;">
+                        <div class="card-header-flex" style="margin-bottom: 1.5rem;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 0.5rem;">
+                                    <span>📊</span>
+                                    <span>تقارير الموارد البشرية والعمليات المتكاملة مع نظام الفلاتر</span>
+                                </h3>
+                                <p style="font-size: 0.85rem; color: #64748b; margin: 0.25rem 0 0;">
+                                    ربط مباشر وشامل لأداء موظفي النظام، مبيعاتهم، سندات التحصيل، عمليات الصيانة، وتتبع رحلات الفنيين
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button type="button" onclick="window.print()" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                    <span>🖨️</span>
+                                    <span>طباعة التقرير</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 1. شريط المؤشرات المالية والتشغيلية للنظام بالكامل -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                            
+                            <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 14px; padding: 1.25rem; color: #fff; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; opacity: 0.9;">🛒 إجمالي مبيعات النظام</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">{{ $systemHrMetrics['total_sales_count'] ?? 0 }} فاتورة</span>
+                                </div>
+                                <div style="font-size: 1.6rem; font-weight: 900;">{{ number_format($systemHrMetrics['total_sales'] ?? 0, 2) }} <span style="font-size: 0.8rem; font-weight: 600;">ر.س</span></div>
+                                <div style="font-size: 0.75rem; margin-top: 0.4rem; opacity: 0.85;">المبيعات الصادرة من الكادر الوظيفي</div>
+                            </div>
+
+                            <div style="background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); border-radius: 14px; padding: 1.25rem; color: #fff; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; opacity: 0.9;">💵 المحصل نقداً وبنكياً</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">سندات القبض</span>
+                                </div>
+                                <div style="font-size: 1.6rem; font-weight: 900;">{{ number_format($systemHrMetrics['total_paid'] ?? 0, 2) }} <span style="font-size: 0.8rem; font-weight: 600;">ر.س</span></div>
+                                <div style="font-size: 0.75rem; margin-top: 0.4rem; opacity: 0.85;">التحصيلات المقبوضة فعلياً في الصناديق</div>
+                            </div>
+
+                            <div style="background: linear-gradient(135deg, #e11d48 0%, #f43f5e 100%); border-radius: 14px; padding: 1.25rem; color: #fff; box-shadow: 0 4px 14px rgba(244, 63, 94, 0.25);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; opacity: 0.9;">📌 الذمم والمستحقات المتبقية</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">على العملاء</span>
+                                </div>
+                                <div style="font-size: 1.6rem; font-weight: 900;">{{ number_format($systemHrMetrics['total_receivables'] ?? 0, 2) }} <span style="font-size: 0.8rem; font-weight: 600;">ر.س</span></div>
+                                <div style="font-size: 0.75rem; margin-top: 0.4rem; opacity: 0.85;">متبقي فواتير البيع الآجلة غير المسددة</div>
+                            </div>
+
+                            <div style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); border-radius: 14px; padding: 1.25rem; color: #fff; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; opacity: 0.9;">🔧 تذاكر الصيانة المنجزة</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">{{ $systemHrMetrics['completed_tickets'] ?? 0 }} / {{ $systemHrMetrics['total_tickets'] ?? 0 }}</span>
+                                </div>
+                                <div style="font-size: 1.6rem; font-weight: 900;">{{ ($systemHrMetrics['total_tickets'] ?? 0) > 0 ? round((($systemHrMetrics['completed_tickets'] ?? 0) / $systemHrMetrics['total_tickets']) * 100) : 0 }}%</div>
+                                <div style="font-size: 0.75rem; margin-top: 0.4rem; opacity: 0.85;">نسبة إنجاز طلبات الصيانة الميدانية</div>
+                            </div>
+
+                            <div style="background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%); border-radius: 14px; padding: 1.25rem; color: #fff; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; opacity: 0.9;">🚗 تتبع الفنيين والسيارات</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">{{ $systemHrMetrics['total_trips'] ?? 0 }} رحلة</span>
+                                </div>
+                                <div style="font-size: 1.6rem; font-weight: 900;">{{ number_format($systemHrMetrics['total_km'] ?? 0, 1) }} <span style="font-size: 0.8rem; font-weight: 600;">كم</span></div>
+                                <div style="font-size: 0.75rem; margin-top: 0.4rem; opacity: 0.85;">إجمالي المسافات المقطوعة ميدانياً</div>
+                            </div>
+
+                            <div style="background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%); border-radius: 14px; padding: 1.25rem; color: #fff; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; opacity: 0.9;">💼 فاتورة الرواتب الأساسية</span>
+                                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 800;">{{ count($hrEmployees ?? []) }} موظف</span>
+                                </div>
+                                <div style="font-size: 1.6rem; font-weight: 900;">{{ number_format($systemHrMetrics['total_monthly_salaries'] ?? 0, 2) }} <span style="font-size: 0.8rem; font-weight: 600;">ر.س</span></div>
+                                <div style="font-size: 0.75rem; margin-top: 0.4rem; opacity: 0.85;">إجمالي الرواتب الأساسية للكادر شهرياً</div>
+                            </div>
+
+                        </div>
+
+                        <!-- 2. جدول المصفوفة الشاملة لأداء كادر نظام الفلاتر -->
+                        <div class="card" style="padding: 1.5rem; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div>
+                                    <h4 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #1e293b;">
+                                        👥 تقرير أداء كادر نظام الفلاتر المتكامل (ERP Staff Performance Matrix)
+                                    </h4>
+                                    <p style="margin: 0.2rem 0 0; font-size: 0.8rem; color: #64748b;">
+                                        تتبع إنتاجية كل موظف: المبيعات، التحصيلات، تذاكر الصيانة، الرحلات الميدانية، والعهد
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr style="background: #f8fafc;">
+                                            <th style="padding: 0.75rem;"># الكود</th>
+                                            <th>الموظف</th>
+                                            <th>الدور في نظام الفلاتر</th>
+                                            <th>المبيعات الصادرة</th>
+                                            <th>التحصيلات المالية</th>
+                                            <th>تذاكر الصيانة</th>
+                                            <th>الرحلات والمسافات</th>
+                                            <th>العهد المسلمة</th>
+                                            <th>الراتب الأساسي</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($hrEmployeePerformance ?? [] as $perf)
+                                        <tr>
+                                            <td style="font-weight: 700; color: #64748b; font-family: monospace;">{{ $perf->code }}</td>
+                                            <td>
+                                                <div style="font-weight: 800; color: #1e293b;">{{ $perf->name }}</div>
+                                                <div style="font-size: 0.75rem; color: #94a3b8;">{{ $perf->email }}</div>
+                                            </td>
+                                            <td>
+                                                @if($perf->role_name === 'technician')
+                                                    <span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">🔧 فني ميداني</span>
+                                                @elseif($perf->role_name === 'call_center')
+                                                    <span class="badge" style="background:#fce7f3;color:#be185d;font-weight:700;">📞 كول سنتر</span>
+                                                @elseif($perf->role_name === 'accountant')
+                                                    <span class="badge" style="background:#fef3c7;color:#b45309;font-weight:700;">💰 محاسب</span>
+                                                @elseif($perf->role_name === 'warehouse_keeper')
+                                                    <span class="badge" style="background:#f1f5f9;color:#475569;font-weight:700;">📦 أمين مستودع</span>
+                                                @elseif($perf->role_name === 'maintenance_supervisor')
+                                                    <span class="badge" style="background:#ede9fe;color:#6d28d9;font-weight:700;">🛠️ مشرف صيانة</span>
+                                                @elseif($perf->role_name === 'sales_manager' || $perf->role_name === 'sales_rep')
+                                                    <span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">🛒 مبيعات</span>
+                                                @elseif($perf->role_name === 'super_admin' || $perf->role_name === 'system_admin' || $perf->role_name === 'general_manager')
+                                                    <span class="badge" style="background:#fee2e2;color:#b91c1c;font-weight:700;">👑 إدارة عامة</span>
+                                                @else
+                                                    <span class="badge" style="background:#f3f4f6;color:#374151;font-weight:600;">{{ $perf->job_title }}</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($perf->sales_count > 0)
+                                                    <div style="font-weight: 800; color: #059669;">{{ number_format($perf->sales_total, 2) }} ر.س</div>
+                                                    <div style="font-size: 0.72rem; color: #64748b;">({{ $perf->sales_count }} فاتورة)</div>
+                                                @else
+                                                    <span style="color: #cbd5e1;">--</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($perf->collections_count > 0)
+                                                    <div style="font-weight: 800; color: #2563eb;">{{ number_format($perf->collections_total, 2) }} ر.س</div>
+                                                    <div style="font-size: 0.72rem; color: #64748b;">({{ $perf->collections_count }} سند)</div>
+                                                @else
+                                                    <span style="color: #cbd5e1;">--</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($perf->assigned_tickets > 0)
+                                                    <div style="font-weight: 700; color: #1e293b;">{{ $perf->completed_tickets }} / {{ $perf->assigned_tickets }}</div>
+                                                    <div style="font-size: 0.72rem; color: {{ $perf->completed_tickets == $perf->assigned_tickets ? '#10b981' : '#f59e0b' }}; font-weight: 700;">
+                                                        ({{ round(($perf->completed_tickets / $perf->assigned_tickets) * 100) }}% إنجاز)
+                                                    </div>
+                                                @else
+                                                    <span style="color: #cbd5e1;">--</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($perf->trips_count > 0)
+                                                    <div style="font-weight: 700; color: #0284c7;">{{ $perf->trips_count }} رحلة</div>
+                                                    <div style="font-size: 0.72rem; color: #64748b;">({{ number_format($perf->trips_km, 1) }} كم)</div>
+                                                @else
+                                                    <span style="color: #cbd5e1;">--</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($perf->custodies_count > 0)
+                                                    <span class="badge" style="background: #e2e8f0; color: #334155; font-weight: 700;">{{ $perf->custodies_count }} عهدة</span>
+                                                @else
+                                                    <span style="color: #cbd5e1;">0</span>
+                                                @endif
+                                            </td>
+                                            <td style="font-weight: 800; color: #1e293b;">
+                                                {{ number_format($perf->base_salary, 2) }} ر.س
+                                            </td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="9" style="text-align: center; color: #94a3b8; padding: 2rem;">لا توجد بيانات موظفين لعرضها</td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 3. ملخص حركة الرواتب والمستحقات والخصومات المسجلة -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+                            <div class="card" style="padding: 1.5rem; border-radius: 16px; border: 1px solid #e2e8f0;">
+                                <h4 style="margin: 0 0 1rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 0.4rem;">
+                                    <span>💵</span>
+                                    <span>ملخص مسيرات الرواتب الحديثة</span>
+                                </h4>
+                                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem;">
+                                    <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                                        <span>إجمالي المسيرات المصدرة:</span>
+                                        <strong>{{ count($hrPayrolls ?? []) }} مسير</strong>
+                                    </li>
+                                    <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                                        <span>إجمالي الرواتب الصافية المصروفة:</span>
+                                        <strong style="color: #10b981;">{{ number_format(collect($hrPayrolls ?? [])->sum('net_salary'), 2) }} ر.س</strong>
+                                    </li>
+                                    <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                                        <span>إجمالي بدل السكن والمواصلات:</span>
+                                        <strong>{{ number_format(collect($hrPayrolls ?? [])->sum('housing_allowance') + collect($hrPayrolls ?? [])->sum('transport_allowance'), 2) }} ر.س</strong>
+                                    </li>
+                                    <li style="display: flex; justify-content: space-between;">
+                                        <span>إجمالي الخصومات والاستقطاعات:</span>
+                                        <strong style="color: #ef4444;">{{ number_format(collect($hrPayrolls ?? [])->sum('other_deductions'), 2) }} ر.س</strong>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="card" style="padding: 1.5rem; border-radius: 16px; border: 1px solid #e2e8f0;">
+                                <h4 style="margin: 0 0 1rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 0.4rem;">
+                                    <span>📦</span>
+                                    <span>ملخص العهد وأصول الشركة</span>
+                                </h4>
+                                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem;">
+                                    <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                                        <span>إجمالي العهد المسجلة:</span>
+                                        <strong>{{ count($hrCustodies ?? []) }}</strong>
+                                    </li>
+                                    <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                                        <span>العهد المسلمة للموظفين حالياً:</span>
+                                        <strong style="color: #2563eb;">{{ collect($hrCustodies ?? [])->whereNotNull('emp_name')->count() }}</strong>
+                                    </li>
+                                    <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                                        <span>العهد المتاحة في المستودع:</span>
+                                        <strong style="color: #10b981;">{{ collect($hrCustodies ?? [])->whereNull('emp_name')->count() }}</strong>
+                                    </li>
+                                    <li style="display: flex; justify-content: space-between;">
+                                        <span>المهام المنجزة بنجاح:</span>
+                                        <strong style="color: #10b981;">{{ collect($hrTasks ?? [])->where('status', 'completed')->count() }} / {{ count($hrTasks ?? []) }}</strong>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ================= MODALS: HR SECTION ================= -->
+            
+            <!-- MODAL: Add Employee with System Role & Login (إضافة موظف جديد وتحديد صلاحياته) -->
+            <div id="hrNewEmployeeModal" class="modal">
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>👤</span>
+                            <span>إضافة موظف جديد وتعيين صلاحياته في نظام الفلاتر</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrNewEmployeeModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.employees.create') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="employees">
+                        
+                        <!-- القسم الأول: الدور والصلاحيات في نظام الفلاتر -->
+                        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:1rem;margin-bottom:1.25rem;">
+                            <div style="font-size:0.9rem;font-weight:800;color:#166534;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.4rem;">
+                                <span>🔐</span>
+                                <span>الدور والصلاحيات في نظام الفلاتر (ERP Role):</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                                <div style="grid-column:1/-1;">
+                                    <label style="font-size:0.85rem;font-weight:700;color:#374151;">اختر دور وصلاحية الموظف: <span style="color:red;">*</span></label>
+                                    <select name="role_id" required class="form-control" style="width:100%;padding:0.55rem;border:1.5px solid #10b981;border-radius:6px;margin-top:0.3rem;font-weight:700;background:#fff;">
+                                        <option value="">-- اضغط لاختيار الدور والصلاحيات --</option>
+                                        @foreach($allRoles as $role)
+                                            @if($role->name !== 'customer')
+                                            <option value="{{ $role->id }}">{{ $role->display_name_ar }} ({{ $role->name }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.85rem;font-weight:700;color:#374151;">البريد الإلكتروني للدخول (Login Email): <span style="color:red;">*</span></label>
+                                    <input type="email" name="email" required placeholder="emp@marswater.local" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.85rem;font-weight:700;color:#374151;">كلمة المرور (Password): <span style="color:red;">*</span></label>
+                                    <input type="password" name="password" required placeholder="•••••••• (6 أحرف فأكثر)" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                </div>
+                                <div style="grid-column:1/-1;">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;background:#fff;padding:0.6rem 0.8rem;border-radius:8px;border:1px solid #d1d5db;">
+                                        <input type="checkbox" name="is_hr_manager" value="1" style="width:18px;height:18px;accent-color:#10b981;">
+                                        <span style="font-size:0.85rem;font-weight:700;color:#1e293b;">منح الموظف صلاحية إدارة الموارد البشرية بالكامل (مسؤول HR)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- القسم الثاني: البيانات الشخصية والتعاقدية -->
+                        <div style="font-size:0.9rem;font-weight:800;color:#1e293b;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.4rem;">
+                            <span>📋</span>
+                            <span>البيانات الوظيفية والتعاقدية:</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">اسم الموظف الكامل: <span style="color:red;">*</span></label>
+                                <input type="text" name="full_name" required placeholder="مثال: عبد الله أحمد السعيد" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الرقم الوظيفي (الكود): <span style="color:red;">*</span></label>
+                                <input type="text" name="employee_code" required value="EMP-{{ rand(100,999) }}" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">المسمى الوظيفي المطبوع:</label>
+                                <input type="text" name="job_title_ar" placeholder="مثال: فني محطات / أخصائي خدمة عملاء" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">رقم الجوال:</label>
+                                <input type="text" name="phone" placeholder="05XXXXXXXX" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">رقم الهوية / الإقامة:</label>
+                                <input type="text" name="national_id" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الراتب الأساسي (ر.س):</label>
+                                <input type="number" name="base_salary" step="0.01" min="0" placeholder="4000.00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">تاريخ التعيين:</label>
+                                <input type="date" name="hire_date" value="{{ date('Y-m-d') }}" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                        </div>
+
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrNewEmployeeModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;display:inline-flex;align-items:center;gap:0.4rem;">
+                                <span>💾</span>
+                                <span>حفظ الموظف وتفعيل حسابه</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: Record Attendance (تسجيل حضور يدوي) -->
+            <div id="hrAttendanceModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #3b82f6; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>🕒</span>
+                            <span>تسجيل حضور يدوي لموظف</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrAttendanceModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.attendance.record') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="attendance">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">اختر الموظف: <span style="color:red;">*</span></label>
+                                <select name="employee_id" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    @foreach($hrEmployees ?? [] as $emp)
+                                    <option value="{{ $emp->id }}">{{ $emp->full_name_ar ?: ($emp->full_name ?: 'موظف') }} (#{{ $emp->employee_code }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">تاريخ الدوام: <span style="color:red;">*</span></label>
+                                <input type="date" name="work_date" value="{{ date('Y-m-d') }}" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الحالة: <span style="color:red;">*</span></label>
+                                <select name="status" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    <option value="present">حاضر</option>
+                                    <option value="late">متأخر</option>
+                                    <option value="excused">مستأذن</option>
+                                    <option value="absent">غائب</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وقت الدخول:</label>
+                                <input type="time" name="check_in" value="08:00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وقت الخروج:</label>
+                                <input type="time" name="check_out" value="16:00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrAttendanceModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">تسجيل الحضور</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: Add Request (تقديم طلب إجازة / سلفة) -->
+            <div id="hrNewRequestModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #ec4899; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>✉️</span>
+                            <span>تقديم طلب إجازة أو سلفة جديدة</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrNewRequestModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.requests.create') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="requests">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الموظف مقدم الطلب: <span style="color:red;">*</span></label>
+                                <select name="employee_id" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    @foreach($hrEmployees ?? [] as $emp)
+                                    <option value="{{ $emp->id }}">{{ $emp->full_name_ar ?: ($emp->full_name ?: 'موظف') }} (#{{ $emp->employee_code }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">نوع الطلب: <span style="color:red;">*</span></label>
+                                <select name="leave_type" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    <option value="annual">إجازة سنوية</option>
+                                    <option value="sick">إجازة مرضية</option>
+                                    <option value="emergency">إجازة اضطرارية</option>
+                                    <option value="loan">طلب سلفة مالية</option>
+                                    <option value="permission">إذن استئذان / خروج</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">من تاريخ: <span style="color:red;">*</span></label>
+                                <input type="date" name="start_date" value="{{ date('Y-m-d') }}" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">إلى تاريخ: <span style="color:red;">*</span></label>
+                                <input type="date" name="end_date" value="{{ date('Y-m-d') }}" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">السبب / الملاحظات:</label>
+                                <textarea name="reason" rows="3" placeholder="اكتب تفاصيل ومبررات الطلب..." class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrNewRequestModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#ec4899;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">إرسال الطلب</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: Add Payroll (إصدار مسير راتب) -->
+            <div id="hrPayrollModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>💵</span>
+                            <span>إصدار مسير راتب شهري</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrPayrollModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.payroll.create') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="payroll">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الموظف: <span style="color:red;">*</span></label>
+                                <select name="employee_id" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    @foreach($hrEmployees ?? [] as $emp)
+                                    <option value="{{ $emp->id }}" data-salary="{{ $emp->base_salary }}">{{ $emp->full_name_ar ?: ($emp->full_name ?: 'موظف') }} (أساسي: {{ $emp->base_salary }} ر.س)</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الشهر: <span style="color:red;">*</span></label>
+                                <select name="pay_period_month" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    @for($m=1; $m<=12; $m++)
+                                    <option value="{{ $m }}" {{ date('n') == $m ? 'selected' : '' }}>شهر {{ $m }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">السنة: <span style="color:red;">*</span></label>
+                                <input type="number" name="pay_period_year" value="{{ date('Y') }}" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الراتب الأساسي: <span style="color:red;">*</span></label>
+                                <input type="number" name="basic_salary" id="payroll_basic" step="0.01" min="0" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">بدل السكن:</label>
+                                <input type="number" name="housing_allowance" step="0.01" min="0" value="0.00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">بدل المواصلات:</label>
+                                <input type="number" name="transport_allowance" step="0.01" min="0" value="0.00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">استقطاعات / خصم:</label>
+                                <input type="number" name="other_deductions" step="0.01" min="0" value="0.00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrPayrollModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">اعتماد المسير</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: Add Custody (إضافة عهدة جديدة) -->
+            <div id="hrCustodyModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>📦</span>
+                            <span>إضافة أصل / عهدة جديدة</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrCustodyModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.custodies.create') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="custodies">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">كود العهدة: <span style="color:red;">*</span></label>
+                                <input type="text" name="code" required value="AST-{{ rand(10,99) }}" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">اسم الأصل / العهدة: <span style="color:red;">*</span></label>
+                                <input type="text" name="name" required placeholder="مثال: لابتوب ديل / سيارة تويوتا" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">نوع العهدة: <span style="color:red;">*</span></label>
+                                <select name="type" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    <option value="جهاز محمول">جهاز محمول / كمبيوتر</option>
+                                    <option value="سيارة نقل">مركبة / سيارة</option>
+                                    <option value="هاتف محمول">هاتف / شريحة اتصال</option>
+                                    <option value="معدات صيانة">معدات وفلاتر صيانة</option>
+                                    <option value="عهدة مالية">عهدة مالية نقدية</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrCustodyModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#64748b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">حفظ العهدة</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: Add Task (تكليف بمهمة جديدة) -->
+            <div id="hrTaskModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #ef4444; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>📋</span>
+                            <span>تكليف بمهمة جديدة لموظف</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrTaskModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.tasks.create') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="tasks">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">عنوان المهمة: <span style="color:red;">*</span></label>
+                                <input type="text" name="title" required placeholder="مثال: فحص محطة تحلية فرع النزهة" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الموظف المكلف:</label>
+                                <select name="employee_id" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    <option value="">-- اختياري (بدون تعيين) --</option>
+                                    @foreach($hrEmployees ?? [] as $emp)
+                                    <option value="{{ $emp->id }}">{{ $emp->full_name_ar ?: ($emp->full_name ?: 'موظف') }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الأولوية: <span style="color:red;">*</span></label>
+                                <select name="priority" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    <option value="medium">متوسطة</option>
+                                    <option value="high">عالية</option>
+                                    <option value="urgent">طارئة جداً</option>
+                                    <option value="low">منخفضة</option>
+                                </select>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">تاريخ الاستحقاق:</label>
+                                <input type="date" name="due_date" value="{{ date('Y-m-d') }}" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الوصف والتفاصيل:</label>
+                                <textarea name="description" rows="3" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrTaskModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#ef4444;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">حفظ وتكليف</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: Add Entitlement (إضافة مستحق / خصم) -->
+            <div id="hrEntitlementModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #a855f7; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>📄</span>
+                            <span>إضافة مستحق أو خصم مالي لموظف</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('hrEntitlementModal')">&times;</button>
+                    </div>
+                    <form action="{{ route('hr.entitlements.create') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="_active_tab" value="hr">
+                        <input type="hidden" name="_hr_subview" value="entitlements">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الموظف: <span style="color:red;">*</span></label>
+                                <select name="employee_id" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    @foreach($hrEmployees ?? [] as $emp)
+                                    <option value="{{ $emp->id }}">{{ $emp->full_name_ar ?: ($emp->full_name ?: 'موظف') }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">النوع: <span style="color:red;">*</span></label>
+                                <select name="type" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                                    <option value="bonus">مكافأة تشجيعية</option>
+                                    <option value="deduction">خصم / جزاء</option>
+                                    <option value="allowance">بدل إضافي</option>
+                                    <option value="advance">دفعة مقدمة / سلفة</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">المبلغ (ر.س): <span style="color:red;">*</span></label>
+                                <input type="number" name="amount" step="0.01" min="0.01" required placeholder="100.00" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">العنوان / البند: <span style="color:red;">*</span></label>
+                                <input type="text" name="title" required placeholder="مثال: مكافأة تميز / تأخير" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">التاريخ: <span style="color:red;">*</span></label>
+                                <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">السبب / البيان:</label>
+                                <textarea name="reason" rows="2" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('hrEntitlementModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#a855f7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">حفظ القيد</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+
+            <!-- ================= TAB: TECHNICIAN TRIPS (تتبع الفنيين) ================= -->
+            @if($isSuperAdmin || $isSystemAdmin)
+            <div id="tab-tech-trips" class="tab-pane">
+                <div class="card-header-flex">
+                    <div>
+                        <h2 class="card-title">
+                            <span style="color:#f59e0b;">📍</span>
+                            <span>تتبع مهام ورحلات الفنيين الميدانيين (خرائط حية)</span>
+                        </h2>
+                        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">
+                            متابعة مواقع وتحركات الفنيين في الميدان، تسجيل المسافات المقطوعة، والمهام المنجزة
+                        </p>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <button class="btn btn-primary" onclick="openDispatchModal()" style="display:inline-flex;align-items:center;gap:0.4rem;background:#1e7e6a;color:#fff;padding:0.55rem 1.1rem;border-radius:8px;font-weight:600;border:none;cursor:pointer;">
+                            <svg fill="none" stroke="currentColor" width="18" height="18" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <span>إرسال فني إلى موقع</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Quick Summary Cards -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:1rem;margin-bottom:1.25rem;">
+                    @php
+                        $tripsList = $technicianTrips ?? collect();
+                        $activeTripsCount = $tripsList->whereIn('status', ['dispatched', 'on_trip'])->count();
+                        $returnedTripsCount = $tripsList->where('status', 'returned')->count();
+                        $totalKmTraveled = $tripsList->sum('km_traveled');
+                    @endphp
+                    <div style="background:#fff;border-radius:12px;padding:1rem;border:1px solid #e2e8f0;display:flex;align-items:center;gap:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="width:44px;height:44px;border-radius:10px;background:#fef3c7;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🚗</div>
+                        <div>
+                            <div style="font-size:0.75rem;color:#64748b;font-weight:600;">في الميدان حالياً</div>
+                            <div style="font-size:1.4rem;font-weight:800;color:#1e293b;">{{ $activeTripsCount }}</div>
+                        </div>
+                    </div>
+                    <div style="background:#fff;border-radius:12px;padding:1rem;border:1px solid #e2e8f0;display:flex;align-items:center;gap:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="width:44px;height:44px;border-radius:10px;background:#dbeafe;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🛣️</div>
+                        <div>
+                            <div style="font-size:0.75rem;color:#64748b;font-weight:600;">إجمالي المسافات المقطوعة</div>
+                            <div style="font-size:1.4rem;font-weight:800;color:#1e293b;">{{ number_format($totalKmTraveled, 1) }} <span style="font-size:0.8rem;font-weight:600;color:#64748b;">كم</span></div>
+                        </div>
+                    </div>
+                    <div style="background:#fff;border-radius:12px;padding:1rem;border:1px solid #e2e8f0;display:flex;align-items:center;gap:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="width:44px;height:44px;border-radius:10px;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">✅</div>
+                        <div>
+                            <div style="font-size:0.75rem;color:#64748b;font-weight:600;">رحلات مكتملة وعادت</div>
+                            <div style="font-size:1.4rem;font-weight:800;color:#1e293b;">{{ $returnedTripsCount }}</div>
+                        </div>
+                    </div>
+                    <div style="background:#fff;border-radius:12px;padding:1rem;border:1px solid #e2e8f0;display:flex;align-items:center;gap:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="width:44px;height:44px;border-radius:10px;background:#f3e8ff;color:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">📍</div>
+                        <div>
+                            <div style="font-size:0.75rem;color:#64748b;font-weight:600;">إجمالي الرحلات المسجلة</div>
+                            <div style="font-size:1.4rem;font-weight:800;color:#1e293b;">{{ count($tripsList) }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Google Maps-Style Interactive Map Section -->
+                <div style="background:#ffffff;border-radius:14px;border:1px solid #e2e8f0;padding:1rem;margin-bottom:1.5rem;box-shadow:0 4px 12px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <span style="font-size:1.2rem;">🗺️</span>
+                            <span style="font-weight:700;color:#1e293b;font-size:0.95rem;">خريطة التتبع المباشر للفنيين (مثل خرائط جوجل)</span>
+                            <span style="font-size:0.75rem;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:12px;font-weight:600;">تحديث تفاعلي</span>
+                        </div>
+                        <div style="display:flex;gap:0.4rem;align-items:center;">
+                            <button type="button" onclick="filterMapMarkers('all')" id="btnMapAll" style="font-size:0.78rem;padding:4px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#1e7e6a;color:#fff;cursor:pointer;font-weight:600;">الكل ({{ count($tripsList) }})</button>
+                            <button type="button" onclick="filterMapMarkers('active')" id="btnMapActive" style="font-size:0.78rem;padding:4px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;cursor:pointer;font-weight:600;">في الميدان ({{ $activeTripsCount }})</button>
+                            <button type="button" onclick="filterMapMarkers('returned')" id="btnMapReturned" style="font-size:0.78rem;padding:4px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;cursor:pointer;font-weight:600;">المكتملة ({{ $returnedTripsCount }})</button>
+                            <button type="button" onclick="centerMapOnRiyadh()" title="إعادة تركيز الخريطة على الرياض" style="font-size:0.78rem;padding:4px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;">🎯 تمركز</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Map Container -->
+                    <div id="techTrackingMap" style="width:100%;height:380px;border-radius:10px;border:1px solid #cbd5e1;background:#e5e7eb;position:relative;z-index:1;"></div>
+
+                    <!-- Map Legend -->
+                    <div style="display:flex;gap:1.25rem;margin-top:0.75rem;padding:0.5rem 0.75rem;background:#f8fafc;border-radius:8px;font-size:0.78rem;color:#475569;flex-wrap:wrap;">
+                        <span style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f59e0b;"></span>
+                            <span>تم الإرسال (في انتظار الوصول)</span>
+                        </span>
+                        <span style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#3b82f6;"></span>
+                            <span>في الطريق / داخل الموقع</span>
+                        </span>
+                        <span style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#10b981;"></span>
+                            <span>عاد وانتهت الرحلة</span>
+                        </span>
+                        <span style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#ef4444;"></span>
+                            <span>ملغي</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Search & Filters Bar -->
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;padding:0.75rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;align-items:center;">
+                    <select id="tripFilterTech" onchange="filterTripsTable()" style="flex:1;min-width:150px;padding:0.45rem 0.6rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;font-size:0.85rem;">
+                        <option value="">-- كل الفنيين --</option>
+                        @foreach($technicians ?? [] as $tech)
+                        <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                        @endforeach
+                    </select>
+                    <select id="tripFilterStatus" onchange="filterTripsTable()" style="flex:1;min-width:140px;padding:0.45rem 0.6rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;font-size:0.85rem;">
+                        <option value="">-- كل الحالات --</option>
+                        <option value="dispatched">تم الإرسال</option>
+                        <option value="on_trip">في الطريق</option>
+                        <option value="returned">عاد</option>
+                        <option value="cancelled">ملغي</option>
+                    </select>
+                    <input type="text" id="tripFilterDest" oninput="filterTripsTable()" placeholder="🔍 ابحث بالوجهة أو رقم السيارة..." style="flex:2;min-width:180px;padding:0.45rem 0.6rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;font-size:0.85rem;">
+                    <button type="button" onclick="resetTripsFilter()" style="padding:0.45rem 0.9rem;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600;">إعادة ضبط</button>
+                </div>
+
+                <!-- Trips Table -->
+                <div class="table-wrap">
+                    <table id="techTripsTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الفني</th>
+                                <th>الوجهة / العنوان</th>
+                                <th>السيارة</th>
+                                <th>وقت المغادرة</th>
+                                <th>وقت العودة</th>
+                                <th>المسافة (كم)</th>
+                                <th>الأعمال المنجزة</th>
+                                <th>الحالة</th>
+                                <th>الإجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($technicianTrips ?? [] as $trip)
+                            <tr data-tech-id="{{ $trip->technician_id }}" data-status="{{ $trip->status }}" data-dest="{{ strtolower($trip->destination_address . ' ' . $trip->vehicle_description) }}">
+                                <td>{{ $trip->id }}</td>
+                                <td>
+                                    <strong>{{ $trip->technician->name ?? '-' }}</strong>
+                                    @if($trip->ticket_id)
+                                    <div style="font-size:0.72rem;color:#0284c7;">تذكرة #{{ $trip->ticket_id }}</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span style="font-weight:600;">{{ $trip->destination_address }}</span>
+                                    @if($trip->latitude && $trip->longitude)
+                                    <button type="button" onclick="focusTripOnMap({{ $trip->id }}, {{ $trip->latitude }}, {{ $trip->longitude }})" style="border:none;background:none;color:#0284c7;cursor:pointer;font-size:0.75rem;display:inline-block;padding:0 2px;" title="عرض على الخريطة">📍 خريطة</button>
+                                    @endif
+                                </td>
+                                <td>{{ $trip->vehicle_description ?? '-' }}</td>
+                                <td>{{ $trip->departure_time ? $trip->departure_time->format('Y-m-d H:i') : '-' }}</td>
+                                <td>{{ $trip->return_time ? $trip->return_time->format('Y-m-d H:i') : '-' }}</td>
+                                <td>
+                                    @if($trip->km_traveled !== null)
+                                    <strong style="color:#1e7e6a;">{{ number_format($trip->km_traveled, 1) }} كم</strong>
+                                    @else
+                                    <span style="color:#94a3b8;">--</span>
+                                    @endif
+                                </td>
+                                <td style="max-width:180px;white-space:normal;font-size:0.8rem;">{{ Str::limit($trip->work_performed ?? '-', 60) }}</td>
+                                <td>
+                                    @php
+                                        $colors = ['dispatched'=>'#f59e0b','on_trip'=>'#3b82f6','returned'=>'#10b981','cancelled'=>'#ef4444'];
+                                        $labels = ['dispatched'=>'تم الإرسال','on_trip'=>'في الطريق','returned'=>'عاد','cancelled'=>'ملغي'];
+                                    @endphp
+                                    <span style="background:{{ $colors[$trip->status] ?? '#6b7280' }};color:#fff;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;">
+                                        {{ $labels[$trip->status] ?? $trip->status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                                        @if($trip->status !== 'returned' && $trip->status !== 'cancelled')
+                                        <button type="button" onclick="openReturnModal({{ $trip->id }}, {{ $trip->odometer_start ?? 0 }})" title="تسجيل العودة واحتساب الكيلومترات" style="background:#10b981;color:#fff;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:600;">↩ عودة</button>
+                                        @endif
+                                        <button type="button" onclick="openEditTripModal({{ $trip->id }})" title="تعديل بيانات الرحلة" style="background:#3b82f6;color:#fff;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:0.75rem;">✏️</button>
+                                        <button type="button" onclick="deleteTrip({{ $trip->id }})" title="حذف" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:0.75rem;">🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--text-muted);">لا توجد رحلات مسجلة بعد</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
+            <!-- ===== MODAL 1: Dispatch Technician (إرسال فني إلى موقع) ===== -->
+            <div id="dispatchModal" class="modal">
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #1e7e6a; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>📍</span>
+                            <span>إرسال فني إلى موقع ميداني</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('dispatchModal')">&times;</button>
+                    </div>
+                    <form id="dispatchForm" action="{{ route('technician.trips.create') }}" method="POST" onsubmit="submitDispatch(event)">
+                        @csrf
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الفني المرسَل: <span style="color:red;">*</span></label>
+                                <select name="technician_id" id="d_tech_id" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                                    <option value="">-- اختر الفني --</option>
+                                    @foreach($technicians ?? [] as $tech)
+                                    <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">تذكرة الصيانة (اختياري):</label>
+                                <select name="ticket_id" id="d_ticket_id" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                                    <option value="">-- بدون تذكرة --</option>
+                                    @foreach($openTickets ?? [] as $ticket)
+                                    <option value="{{ $ticket->id }}">#{{ $ticket->id }} - {{ $ticket->title ?? 'تذكرة' }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وقت المغادرة: <span style="color:red;">*</span></label>
+                                <input type="datetime-local" name="departure_time" id="d_departure" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">رقم / وصف السيارة المسلمة:</label>
+                                <input type="text" name="vehicle_description" id="d_vehicle" placeholder="مثال: تويوتا هايلوكس - 1234 ر أ د" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الوجهة / عنوان الموقع: <span style="color:red;">*</span></label>
+                                <input type="text" name="destination_address" id="d_dest" required placeholder="مثال: الرياض - حي النزهة، شارع أبي بكر..." class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+
+                            <!-- Mini Interactive Location Picker -->
+                            <div style="grid-column:1/-1;background:#f8fafc;padding:0.75rem;border-radius:8px;border:1px solid #e2e8f0;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.3rem;">
+                                    <span style="font-size:0.8rem;font-weight:700;color:#1e293b;">📍 تحديد الموقع على الخريطة (انقر لتثبيت الموقع):</span>
+                                    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                                        <button type="button" onclick="setPickerLocation(24.7610, 46.6990, 'الرياض - حي النزهة')" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">حي النزهة</button>
+                                        <button type="button" onclick="setPickerLocation(24.7136, 46.6753, 'الرياض - حي العليا')" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">حي العليا</button>
+                                        <button type="button" onclick="setPickerLocation(24.7431, 46.7797, 'الرياض - حي الروضة')" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">حي الروضة</button>
+                                        <button type="button" onclick="setPickerLocation(24.8210, 46.6430, 'الرياض - حي الياسمين')" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">حي الياسمين</button>
+                                        <button type="button" onclick="setPickerLocation(24.7339, 46.5750, 'الرياض - الدرعية')" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">الدرعية</button>
+                                    </div>
+                                </div>
+                                <div id="modalPickerMap" style="width:100%;height:180px;border-radius:6px;border:1px solid #cbd5e1;background:#e5e7eb;"></div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.4rem;">
+                                    <input type="text" name="latitude" id="d_lat" placeholder="خط العرض (Lat)" readonly style="font-size:0.75rem;padding:0.3rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;">
+                                    <input type="text" name="longitude" id="d_lng" placeholder="خط الطول (Lng)" readonly style="font-size:0.75rem;padding:0.3rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">عداد الكيلومتر عند المغادرة:</label>
+                                <input type="number" name="odometer_start" id="d_odo_start" min="0" step="0.1" placeholder="مثال: 12500.0" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">ملاحظات المغادرة:</label>
+                                <input type="text" name="notes" id="d_notes" placeholder="أي تفاصيل أو أغراض مسلمة..." class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('dispatchModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#1e7e6a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;display:inline-flex;align-items:center;gap:0.4rem;">
+                                <span>📍</span>
+                                <span>إرسال الفني وتسجيل الرحلة</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ===== MODAL 2: Mark Returned (تسجيل عودة الفني) ===== -->
+            <div id="returnModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>↩</span>
+                            <span>تسجيل عودة الفني واحتساب المسافة</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('returnModal')">&times;</button>
+                    </div>
+                    <form id="returnForm" method="POST" onsubmit="submitReturn(event)">
+                        @csrf
+                        <input type="hidden" id="r_trip_id">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وقت العودة: <span style="color:red;">*</span></label>
+                                <input type="datetime-local" name="return_time" id="r_return_time" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">عداد الكيلومتر عند العودة:</label>
+                                <input type="number" name="odometer_end" id="r_odo_end" min="0" step="0.1" placeholder="مثال: 12545.0" oninput="calcKm()" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:0.75rem 1rem;border-radius:8px;font-weight:700;color:#15803d;font-size:1.05rem;display:flex;align-items:center;justify-content:space-between;">
+                                    <span>المسافة المقطوعة بالسيارة:</span>
+                                    <span id="r_km_display" style="font-size:1.3rem;">--</span>
+                                </div>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الأعمال المنجزة ميدانياً:</label>
+                                <textarea name="work_performed" id="r_work" rows="3" placeholder="وصف للأعمال والصيانة التي تمت عند العميل..." class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">ملاحظات إضافية:</label>
+                                <textarea name="notes" id="r_notes" rows="2" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('returnModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;display:inline-flex;align-items:center;gap:0.4rem;">
+                                <span>✅</span>
+                                <span>تأكيد العودة وحفظ السجل</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ===== MODAL 3: Edit Trip (تعديل بيانات الرحلة) ===== -->
+            <div id="editTripModal" class="modal">
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3 style="font-weight: 700; color: #3b82f6; display: flex; align-items: center; gap: 0.5rem; margin:0;">
+                            <span>✏️</span>
+                            <span>تعديل بيانات الرحلة الميدانية</span>
+                        </h3>
+                        <button type="button" class="close-btn" onclick="closeModal('editTripModal')">&times;</button>
+                    </div>
+                    <form id="editTripForm" method="POST" onsubmit="submitEditTrip(event)">
+                        @csrf
+                        <input type="hidden" id="et_trip_id">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الفني: <span style="color:red;">*</span></label>
+                                <select name="technician_id" id="et_tech" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                                    @foreach($technicians ?? [] as $tech)
+                                    <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">حالة الرحلة:</label>
+                                <select name="status" id="et_status" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                                    <option value="dispatched">تم الإرسال</option>
+                                    <option value="on_trip">في الطريق</option>
+                                    <option value="returned">عاد</option>
+                                    <option value="cancelled">ملغي</option>
+                                </select>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الوجهة / العنوان: <span style="color:red;">*</span></label>
+                                <input type="text" name="destination_address" id="et_dest" required class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وصف السيارة:</label>
+                                <input type="text" name="vehicle_description" id="et_vehicle" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وقت المغادرة:</label>
+                                <input type="datetime-local" name="departure_time" id="et_departure" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">عداد البداية (كم):</label>
+                                <input type="number" name="odometer_start" id="et_odo_start" min="0" step="0.1" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">عداد النهاية (كم):</label>
+                                <input type="number" name="odometer_end" id="et_odo_end" min="0" step="0.1" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">وقت العودة:</label>
+                                <input type="datetime-local" name="return_time" id="et_return" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">الأعمال المنجزة:</label>
+                                <textarea name="work_performed" id="et_work" rows="3" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label style="font-size:0.85rem;font-weight:700;color:#374151;">ملاحظات:</label>
+                                <textarea name="notes" id="et_notes" rows="2" class="form-control" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;margin-top:0.3rem;resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                            <button type="button" onclick="closeModal('editTripModal')" style="padding:0.55rem 1.25rem;background:#f1f5f9;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.4rem;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;">💾 حفظ التعديلات</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ================= TAB: PRODUCTS SCREEN (شاشة الأصناف) ================= -->
+            @if($isSuperAdmin || $isSystemAdmin || $isAccountant)
+            <div id="tab-products" class="tab-pane">
+                <div class="card-header-flex">
+                    <div>
+                        <h2 class="card-title">
+                            <span style="color: #10b981;">📦</span>
+                            <span>شاشة إدارة الأصناف والمنتجات</span>
+                        </h2>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
+                            إضافة وتعديل وعرض جميع أصناف المنتجات: الأجهزة، الفلاتر، قطع الغيار، والخدمات
+                        </p>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" onclick="openNewProductModal()">
+                            + إضافة صنف جديد
+                        </button>
+                    </div>
+                </div>
+
+                <!-- فلاتر البحث -->
+                <div class="glass table-card" style="margin-bottom: 1rem; padding: 1rem;">
+                    <div class="form-row" style="grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr; gap: 0.75rem; align-items: flex-end;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">بحث بالاسم:</label>
+                            <input type="text" id="productSearchName" class="form-control" placeholder="ابحث باسم الصنف..." oninput="filterProducts()">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">بحث بالكود SKU:</label>
+                            <input type="text" id="productSearchSku" class="form-control" placeholder="كود SKU..." oninput="filterProducts()">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">التصنيف:</label>
+                            <select id="productFilterCategory" class="form-control" onchange="filterProducts()">
+                                <option value="">-- كل التصنيفات --</option>
+                                @foreach($categories as $cat)
+                                <option value="{{ $cat->id }}">{{ $cat->name_ar }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">نوع الصنف (مركب/غير مركب):</label>
+                            <select id="productFilterCompound" class="form-control" onchange="filterProducts()">
+                                <option value="">-- الكل --</option>
+                                <option value="1">مركب</option>
+                                <option value="0">غير مركب</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول الأصناف -->
+                <div class="glass table-card">
+                    <div class="table-responsive">
+                        <table id="productsTable">
+                            <thead>
+                                <tr>
+                                    <th>كود SKU</th>
+                                    <th>الاسم</th>
+                                    <th>التصنيف</th>
+                                    <th>النوع</th>
+                                    <th>الهيكل (مركب؟)</th>
+                                    <th>تاريخ الإضافة</th>
+                                    <th>سعر التكلفة</th>
+                                    <th>سعر البيع</th>
+                                    <th>الرصيد المتاح</th>
+                                    <th>الحالة</th>
+                                    <th style="text-align: center;">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($allProducts as $ap)
+                                <tr data-name="{{ strtolower($ap->name_ar . ' ' . ($ap->name_en ?? '')) }}"
+                                    data-sku="{{ strtolower($ap->sku) }}"
+                                    data-category="{{ $ap->category_id ?? '' }}"
+                                    data-compound="{{ $ap->is_compound ? '1' : '0' }}">
+                                    <td class="num" style="color: #38bdf8; font-weight: 800;">{{ $ap->sku }}</td>
+                                    <td>
+                                        <div style="font-weight: 700; color: #1e293b;">{{ $ap->name_ar }}</div>
+                                        @if($ap->name_en)
+                                        <div style="font-size: 0.75rem; color: var(--text-dim);">{{ $ap->name_en }}</div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($ap->category)
+                                            <span class="badge badge-assigned" style="background: rgba(30,126,106,0.1); color: var(--accent-cyan);">{{ $ap->category->name_ar }}</span>
+                                        @else
+                                            <span style="color: var(--text-dim);">—</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @php
+                                        $typeLabels = [
+                                            'water_device' => ['label' => 'جهاز مياه', 'color' => '#1e7e6a'],
+                                            'filter_cartridge' => ['label' => 'فلتر / شمعة', 'color' => '#10b981'],
+                                            'membrane' => ['label' => 'غشاء تحلية', 'color' => '#7c3aed'],
+                                            'pump' => ['label' => 'مضخة', 'color' => '#f59e0b'],
+                                            'spare_part' => ['label' => 'قطعة غيار', 'color' => '#ef4444'],
+                                            'service' => ['label' => 'خدمة', 'color' => '#64748b'],
+                                        ];
+                                        $tl = $typeLabels[$ap->type] ?? ['label' => $ap->type, 'color' => '#64748b'];
+                                        @endphp
+                                        <span class="badge" style="background: rgba(30,126,106,0.08); color: {{ $tl['color'] }}; border: 1px solid {{ $tl['color'] }}33;">{{ $tl['label'] }}</span>
+                                    </td>
+                                    <td>
+                                        @if($ap->is_compound)
+                                            <span class="badge badge-active" style="background: rgba(16,185,129,0.15); color: #059669; font-weight: 700;">مركب ✓</span>
+                                        @else
+                                            <span style="color: #64748b; font-size: 0.8rem; font-weight: 600;">غير مركب</span>
+                                        @endif
+                                    </td>
+                                    <td class="num" style="font-size: 0.8rem; color: var(--text-muted);">
+                                        {{ $ap->created_at?->format('Y-m-d') ?? '-' }}
+                                    </td>
+                                    <td class="num">{{ number_format($ap->cost_price, 2) }} ر.س</td>
+                                    <td class="num" style="color: #10b981; font-weight: 700;">{{ number_format($ap->selling_price, 2) }} ر.س</td>
+                                    <td class="num" style="font-weight: 800; color: #1e293b;">
+                                        {{ $ap->stockBalances->sum('quantity') }} {{ $ap->unit ?? 'قطعة' }}
+                                    </td>
+                                    <td>
+                                        @if($ap->is_active)
+                                            <span class="badge badge-active">نشط</span>
+                                        @else
+                                            <span class="badge badge-overdue">غير نشط</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; gap: 0.35rem; align-items: center; justify-content: center;">
+                                            <!-- زر تعديل الصنف -->
+                                            <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #0284c7;"
+                                                onclick="openEditProductModal({{ json_encode([
+                                                    'id' => $ap->id,
+                                                    'name_ar' => $ap->name_ar,
+                                                    'name_en' => $ap->name_en,
+                                                    'sku' => $ap->sku,
+                                                    'barcode' => $ap->barcode,
+                                                    'type' => $ap->type,
+                                                    'category_id' => $ap->category_id,
+                                                    'is_compound' => $ap->is_compound ? 1 : 0,
+                                                    'cost_price' => (float)$ap->cost_price,
+                                                    'selling_price' => (float)$ap->selling_price,
+                                                    'unit' => $ap->unit ?? 'قطعة',
+                                                    'created_at' => $ap->created_at?->format('Y-m-d')
+                                                ]) }})" title="تعديل بيانات الصنف">
+                                                ✏️ تعديل
+                                            </button>
+
+                                            <!-- زر طباعة بطاقة الصنف والباركود -->
+                                            <a href="{{ route('products.print', $ap->id) }}" target="_blank" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #10b981;" title="طباعة بطاقة الصنف والباركود">
+                                                🖨️ طباعة
+                                            </a>
+
+                                            <!-- زر حذف الصنف -->
+                                            <form action="{{ route('products.delete', $ap->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف الصنف ({{ addslashes($ap->name_ar) }}) نهائياً؟');" style="display: inline;">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #ef4444; border-color: rgba(239,68,68,0.3);" title="حذف الصنف">
+                                                    🗑️ حذف
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="11" style="text-align: center; color: var(--text-dim); padding: 30px;">لا توجد أصناف مسجلة. اضغط على (+ إضافة صنف جديد) لإضافة أول صنف.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
             <!-- ================= TAB 6: SUPPLIERS SCREEN (شاشة الموردين الجديدة) ================= -->
             <div id="tab-suppliers" class="tab-pane">
                 <div class="card-header-flex">
@@ -2598,6 +4577,25 @@
                 <div class="sub-nav-pills">
                     <button class="sub-pill active" onclick="switchSuppliersSubTab('directory', this)">دليل الموردين وشركاء التوريد ({{ count($suppliers) }})</button>
                     <button class="sub-pill" onclick="switchSuppliersSubTab('orders', this)">أوامر الشراء والتوريد ({{ count($purchaseOrders) }})</button>
+                </div>
+
+                <!-- شريط فلاتر البحث لشاشة المشتريات والموردين (رقم الفاتورة وأمر الشراء / كود أو رقم المورد أو اسمه) -->
+                <div class="glass" style="padding: 0.85rem 1.25rem; margin-bottom: 1.2rem; border-radius: 12px; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #0284c7; font-size: 13px;">
+                        <span>🔍 فلاتر بحث المشتريات والموردين:</span>
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                        <input type="text" id="procSearchPoNo" class="form-control" placeholder="بحث برقم أمر الشراء / فاتورة الشراء (مثال: PO-...)..." oninput="filterProcurementTable()" style="font-size: 12.5px;">
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                        <input type="text" id="procSearchSupplier" class="form-control" placeholder="بحث برقم/كود المورد، الجوال أو الاسم (مثال: SUP-... أو 05...)..." oninput="filterProcurementTable()" style="font-size: 12.5px;">
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline" onclick="resetProcurementFilter()" style="padding: 0.45rem 1rem; font-size: 12px;">
+                            إعادة تعيين الفلتر
+                        </button>
+                    </div>
+                    <div id="procFilterCount" style="font-size: 12px; color: var(--text-muted); font-weight: 600;"></div>
                 </div>
 
                 <!-- SUB-PANE 1: SUPPLIERS DIRECTORY -->
@@ -3146,6 +5144,7 @@
                                             'reports' => 'التقارير والتحليلات',
                                             'settings' => 'إعدادات وسياسات المنظومة',
                                             'catalog' => 'الكتالوج والمنتجات',
+                                            'hr' => 'الموارد البشرية والكادر الوظيفي',
                                             default => $module
                                         } }}</strong> ({{ count($perms) }} صلاحية)
                                     </span>
@@ -3491,6 +5490,80 @@
                             @endif
                         </div>
 
+                        <!-- ───── تحديث ومزامنة النظام من GitHub (Hostinger & Server Deployment) ───── -->
+                        <div class="settings-section settings-full-width" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(56, 189, 248, 0.04) 100%); border: 1.5px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 1.75rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.25rem; margin-bottom: 1.5rem;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+                                        <span style="font-size: 1.4rem;">🚀</span>
+                                        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #10b981;">
+                                            تحديث النظام التلقائي ومزامنة GitHub و Hostinger
+                                        </h3>
+                                    </div>
+                                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                                        سحب أحدث إصدار برمجي من مستودع GitHub، وتشغيل المايجريشن لقاعدة البيانات، ومسح وإعادة بناء الكاش لتحسين الأداء على سيرفر هوستنجر.
+                                    </p>
+                                </div>
+
+                                @if($isSuperAdmin || $isSystemAdmin)
+                                <button type="button" class="btn btn-success" style="padding: 0.75rem 1.75rem; font-size: 0.95rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); border: none; border-radius: 10px; cursor: pointer;" onclick="executeSystemUpdate(this)">
+                                    <span>🔄</span>
+                                    <span>سحب التحديثات وتحديث النظام الآن</span>
+                                </button>
+                                @endif
+                            </div>
+
+                            <!-- تفاصيل الاتصال والاستضافة -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                                <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 0.85rem 1rem;">
+                                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.25rem;">مستودع GitHub المربوط:</div>
+                                    <div style="font-size: 0.825rem; font-weight: 700; color: #38bdf8; word-break: break-all;">
+                                        github.com/axiomhaidarcreate/whater.git
+                                    </div>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 0.85rem 1rem;">
+                                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.25rem;">الفرع النشط (Branch):</div>
+                                    <div style="font-size: 0.85rem; font-weight: 800; color: #34d399;">main (Production)</div>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 0.85rem 1rem;">
+                                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.25rem;">تاريخ آخر تحديث تم تنفيذه:</div>
+                                    <div style="font-size: 0.85rem; font-weight: 700; color: #f59e0b;">
+                                        {{ \App\Models\SystemSetting::get('last_system_update_at', 'لم يتم التحديث بعد') }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- رابط Webhook للتحديث التلقائي الفوري عند كل Git Push -->
+                            <div style="background: rgba(255,255,255,0.03); border: 1px dashed rgba(56,189,248,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.8rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 0.4rem;">
+                                        <span>⚡</span>
+                                        <span>رابط Webhook للتحديث التلقائي (Auto-Deploy Webhook):</span>
+                                    </span>
+                                    <span style="font-size: 0.72rem; color: var(--text-dim);">ضعه في إعدادات GitHub Webhooks أو Hostinger Git للتحديث الفوري تلقائياً عند أي Push</span>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="text" readonly id="deployWebhookUrl" value="{{ url('/deploy-webhook?token=' . \App\Models\SystemSetting::get('deploy_webhook_token', 'whater_deploy_secret_2026')) }}" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem 0.75rem; color: #38bdf8; font-size: 0.78rem; font-family: monospace;" onclick="this.select()">
+                                    <button type="button" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.78rem;" onclick="navigator.clipboard.writeText(document.getElementById('deployWebhookUrl').value); alert('تم نسخ رابط Webhook بنجاح!');">📋 نسخ</button>
+                                </div>
+                            </div>
+
+                            @php
+                                $lastLog = session('system_update_log') ?: \App\Models\SystemSetting::get('last_system_update_log');
+                            @endphp
+                            @if($lastLog)
+                            <!-- سجل مخرجات التحديث الأخير -->
+                            <div style="margin-top: 1.25rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">📋 سجل مخرجات التحديث الأخير (Execution Log):</span>
+                                    <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-weight: 700;">مكتمل بنجاح</span>
+                                </div>
+                                <pre style="background: #090d16; color: #38bdf8; padding: 1rem; border-radius: 10px; font-size: 0.75rem; line-height: 1.5; font-family: 'Consolas', monospace; overflow-x: auto; max-height: 220px; border: 1px solid rgba(255,255,255,0.08); white-space: pre-wrap;">{{ $lastLog }}</pre>
+                            </div>
+                            @endif
+
+                        </div>
+
                         <!-- ───── معلومات الإصدار ───── -->
                         <div class="settings-section settings-full-width" style="background:rgba(56,189,248,0.04); border-color:rgba(56,189,248,0.15);">
                             <div style="display:flex; flex-wrap:wrap; gap:2rem; align-items:center; justify-content:space-between;">
@@ -3517,6 +5590,13 @@
                 @if($isSuperAdmin)
                 <form action="{{ route('admin.reset-demo') }}" method="POST" id="resetDemoForm" style="display:none;">
                     @csrf
+                </form>
+                @endif
+
+                @if($isSuperAdmin || $isSystemAdmin)
+                <form action="{{ route('admin.system.update') }}" method="POST" id="systemUpdateForm" style="display:none;">
+                    @csrf
+                    <input type="hidden" name="_active_tab" value="settings">
                 </form>
                 @endif
 
@@ -3611,6 +5691,23 @@
                     </div>
                 </div>
 
+                <!-- Barcode Scanner Input -->
+                <div style="margin-bottom: 0.75rem; background: rgba(15,23,42,0.5); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 0.75rem 1rem;">
+                    <label style="font-size: 12px; color: #38bdf8; font-weight: 700; display:block; margin-bottom: 4px;">📷 مسح الباركود / إدخال الكود يدوياً:</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" id="posBarcodeInput" class="form-control num" autocomplete="off"
+                            placeholder="امسح الباركود أو أدخل SKU ثم اضغط Enter..."
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();posSearchByBarcode();}"
+                            style="flex:1; font-size:14px; letter-spacing:1px;">
+                        <button type="button" onclick="posSearchByBarcode()"
+                            style="background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff; border:none;
+                                   border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px; font-weight:700; white-space:nowrap;">
+                            🔍 بحث
+                        </button>
+                    </div>
+                    <div id="posBarcodeMsg" style="font-size:11.5px; margin-top:4px; color:#94a3b8;"></div>
+                </div>
+
                 <!-- Dynamic Items Selector -->
                 <div style="margin-top: 1rem; margin-bottom: 1rem;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
@@ -3676,20 +5773,57 @@
                     </div>
                 </div>
 
-                <!-- Totals Live Box -->
-                <div style="background: rgba(2, 132, 199, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-                    <div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">المجموع قبل الضريبة: <span id="posSubtotalDisp" class="num" style="color: #fff; font-weight: 700;">0.00</span> ر.س</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">ضريبة القيمة المضافة (15%): <span id="posTaxDisp" class="num" style="color: #fff; font-weight: 700;">0.00</span> ر.س</div>
+                <!-- Totals Live Box & Barcode/QR Code Container -->
+                <div style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">المجموع قبل الضريبة: <span id="posSubtotalDisp" class="num" style="color: #0f172a; font-weight: 700;">0.00</span> ر.س</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">ضريبة القيمة المضافة (15%): <span id="posTaxDisp" class="num" style="color: #0f172a; font-weight: 700;">0.00</span> ر.س</div>
+                        </div>
+                        <div style="text-align: left;">
+                            <div style="font-size: 0.85rem; color: #0284c7; font-weight: 700;">الإجمالي الكلي النهائي:</div>
+                            <div id="posGrandTotalDisp" class="num" style="font-size: 1.8rem; font-weight: 800; color: #10b981;">0.00 ر.س</div>
+                        </div>
                     </div>
-                    <div style="text-align: left;">
-                        <div style="font-size: 0.85rem; color: #38bdf8; font-weight: 700;">الإجمالي الكلي النهائي:</div>
-                        <div id="posGrandTotalDisp" class="num" style="font-size: 1.8rem; font-weight: 800; color: #34d399;">0.00 ر.س</div>
+
+                    <!-- باركود / QR Code ضريبي وتوثيقي للتصوير والمسح تحت الإجمالي مباشرة -->
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; background: #ffffff; border-radius: 10px; padding: 0.85rem 1.2rem; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: #fff; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;">
+                                <img id="posLiveQrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=MARS-POS-INVOICE" alt="QR Code" style="width: 85px; height: 85px; display: block;" onerror="this.onerror=null; this.src='https://quickchart.io/qr?size=95&text=MARS-POS-INVOICE';">
+                            </div>
+                            <div>
+                                <div style="font-size: 12.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px;">
+                                    <span>📱 باركود QR ضريبي معتمد للتصوير والمسح</span>
+                                </div>
+                                <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
+                                    امسح بالكاميرا للتحقق من بيانات الفاتورة والإجمالي والضريبة
+                                </div>
+                                <div style="font-size: 11px; color: #0284c7; margin-top: 2px; font-weight: 600;" id="posBarcodeSummaryText">
+                                    المؤسسة: تقنية الفلاتر | القيمة: 0.00 ر.س
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: left; display: flex; flex-direction: column; align-items: center;">
+                            <!-- باركود خطي Code128 إضافي للمسح بالماسح الضوئي -->
+                            <img id="posLiveLinearBarcode" src="https://bwipjs-api.metafloor.com/?bcid=code128&text=POS-TOTAL-000&scale=2&height=8&includetext=false" alt="Barcode" style="height: 38px; max-width: 170px;" onerror="this.style.display='none';">
+                            <span style="font-size: 10px; color: #94a3b8; margin-top: 2px; font-family: monospace;">CODE128 SCANNER READY</span>
+                        </div>
                     </div>
                 </div>
 
-                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap;">
                     <button type="button" class="btn btn-outline" onclick="closeModal('newSaleModal')">إلغاء</button>
+                    <button type="button" onclick="printPosSalePreview()"
+                        style="background: #0f172a; color: #fff; border: 1px solid #334155; border-radius: 8px;
+                               padding: 0.6rem 1.4rem; cursor: pointer; font-size: 0.95rem; font-weight: 700;
+                               display: inline-flex; align-items: center; gap: 7px;">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                        </svg>
+                        طباعة / معاينة الفاتورة
+                    </button>
                     <button type="submit" class="btn btn-success" style="font-size: 0.95rem; padding: 0.6rem 1.8rem;">
                         ✓ تأكيد العملية وإصدار الفاتورة فورياً
                     </button>
@@ -3800,19 +5934,231 @@
         </div>
     </div>
 
+    <!-- MODAL: Add Product (إضافة صنف جديد) -->
+    <div id="newProductModal" class="modal">
+        <div class="modal-content modal-lg" style="max-width: 850px;">
+            <div class="modal-header">
+                <h3 style="font-weight: 700; color: #10b981;">📦 + إضافة صنف ومنتج جديد</h3>
+                <button class="close-btn" onclick="closeModal('newProductModal')">&times;</button>
+            </div>
+
+            <form action="{{ route('products.create') }}" method="POST">
+                @csrf
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>اسم الصنف بالعربية: <span style="color:#ef4444">*</span></label>
+                        <input type="text" name="name_ar" class="form-control" placeholder="مثال: محطة تحلية منزلية 7 مراحل" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>اسم الصنف بالإنجليزية (اختياري):</label>
+                        <input type="text" name="name_en" class="form-control" placeholder="7-Stage RO System">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>كود الصنف (SKU - يولد تلقائياً إن ترك فارغاً):</label>
+                        <input type="text" name="sku" class="form-control" placeholder="FLT-RO-07">
+                    </div>
+
+                    <div class="form-group">
+                        <label>الباركود (اختياري):</label>
+                        <input type="text" name="barcode" class="form-control" placeholder="6281000000000">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>نوع الصنف: <span style="color:#ef4444">*</span></label>
+                        <select name="type" class="form-control" required>
+                            <option value="water_device">جهاز مياه / محطة تحلية منزلية</option>
+                            <option value="filter_cartridge">فلتر مياه / شمعة فلتر</option>
+                            <option value="membrane">غشاء ممبرين تناضح عكسي</option>
+                            <option value="pump">مضخة مياه</option>
+                            <option value="spare_part">قطعة غيار / وصلات</option>
+                            <option value="service">خدمة صيانة / فحص</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>هيكل الصنف (مركب / غير مركب): <span style="color:#ef4444">*</span></label>
+                        <select name="is_compound" class="form-control" required>
+                            <option value="0">صنف بسيط (غير مركب)</option>
+                            <option value="1">صنف مركب (تجميعي / مكوّن من عدة قطع)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>تاريخ الإضافة:</label>
+                        <input type="date" name="created_at" class="form-control" value="{{ date('Y-m-d') }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>التصنيف:</label>
+                        <select name="category_id" class="form-control">
+                            <option value="">-- بدون تصنيف --</option>
+                            @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->name_ar }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>وحدة القياس:</label>
+                        <input type="text" name="unit" class="form-control" value="قطعة">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>سعر التكلفة الافتراضي (ر.س):</label>
+                        <input type="number" step="0.01" name="cost_price" class="form-control num" value="0.00" min="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label>سعر البيع الافتراضي (ر.س):</label>
+                        <input type="number" step="0.01" name="selling_price" class="form-control num" value="0.00" min="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label>حد إعادة الطلب بالمخزن:</label>
+                        <input type="number" name="reorder_level" class="form-control num" value="5" min="0">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('newProductModal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669);">حفظ وإضافة الصنف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Edit Product (تعديل صنف) -->
+    <div id="editProductModal" class="modal">
+        <div class="modal-content modal-lg" style="max-width: 850px;">
+            <div class="modal-header">
+                <h3 style="font-weight: 700; color: #0284c7;">✏️ تعديل بيانات الصنف</h3>
+                <button class="close-btn" onclick="closeModal('editProductModal')">&times;</button>
+            </div>
+
+            <form id="editProductForm" action="" method="POST">
+                @csrf
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>اسم الصنف بالعربية: <span style="color:#ef4444">*</span></label>
+                        <input type="text" name="name_ar" id="editProdNameAr" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>اسم الصنف بالإنجليزية (اختياري):</label>
+                        <input type="text" name="name_en" id="editProdNameEn" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>كود الصنف SKU: <span style="color:#ef4444">*</span></label>
+                        <input type="text" name="sku" id="editProdSku" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>الباركود (اختياري):</label>
+                        <input type="text" name="barcode" id="editProdBarcode" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>نوع الصنف: <span style="color:#ef4444">*</span></label>
+                        <select name="type" id="editProdType" class="form-control" required>
+                            <option value="water_device">جهاز مياه / محطة تحلية منزلية</option>
+                            <option value="filter_cartridge">فلتر مياه / شمعة فلتر</option>
+                            <option value="membrane">غشاء ممبرين تناضح عكسي</option>
+                            <option value="pump">مضخة مياه</option>
+                            <option value="spare_part">قطعة غيار / وصلات</option>
+                            <option value="service">خدمة صيانة / فحص</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>هيكل الصنف (مركب / غير مركب): <span style="color:#ef4444">*</span></label>
+                        <select name="is_compound" id="editProdIsCompound" class="form-control" required>
+                            <option value="0">صنف بسيط (غير مركب)</option>
+                            <option value="1">صنف مركب (تجميعي / مكوّن من عدة قطع)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>تاريخ الإضافة:</label>
+                        <input type="date" name="created_at" id="editProdCreatedAt" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>التصنيف:</label>
+                        <select name="category_id" id="editProdCategory" class="form-control">
+                            <option value="">-- بدون تصنيف --</option>
+                            @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->name_ar }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>وحدة القياس:</label>
+                        <input type="text" name="unit" id="editProdUnit" class="form-control" value="قطعة">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>سعر التكلفة الافتراضي (ر.س):</label>
+                        <input type="number" step="0.01" name="cost_price" id="editProdCostPrice" class="form-control num" min="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label>سعر البيع الافتراضي (ر.س):</label>
+                        <input type="number" step="0.01" name="selling_price" id="editProdSellingPrice" class="form-control num" min="0">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editProductModal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #0369a1);">حفظ التعديلات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL 4: New Purchase Order (إضافة مشتريات وتوريد PO) -->
     <div id="newPurchaseOrderModal" class="modal">
-        <div class="modal-content modal-lg">
+        <div class="modal-content modal-lg" style="max-width: 960px;">
             <div class="modal-header">
                 <h3 style="font-weight: 700; color: #0284c7;">📦 + إضافة مشتريات وتوريد رسمي (Purchase Order)</h3>
                 <button class="close-btn" onclick="closeModal('newPurchaseOrderModal')">&times;</button>
             </div>
 
-            <form action="{{ route('procurement.orders.create') }}" method="POST">
+            <form action="{{ route('procurement.orders.create') }}" method="POST" id="poMainForm">
                 @csrf
-                <div class="form-row-3">
+                <input type="hidden" name="tax_amount" id="poHiddenTaxAmount" value="0.00">
+
+                <!-- الصف الأول: المورد + المستودع + التاريخ + فاتورة المورد -->
+                <div class="form-row" style="grid-template-columns: 2fr 1.5fr 1.2fr 1.2fr;">
+                    <!-- المورد + زر إضافة مورد جديد -->
                     <div class="form-group">
-                        <label>المورد المعتمد:</label>
+                        <label style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>المورد المعتمد: <span style="color:#ef4444">*</span></span>
+                            <button type="button" onclick="openAddSupplierInlinePanel()"
+                                style="font-size:11px; color:#0284c7; background:none; border:1px solid #bae6fd;
+                                       border-radius:6px; padding:2px 8px; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                                + مورد جديد
+                            </button>
+                        </label>
                         <select name="supplier_id" id="poSupplierSelector" class="form-control" required>
                             @foreach($suppliers as $sp)
                             <option value="{{ $sp->id }}">{{ $sp->name }} ({{ $sp->supplier_code }})</option>
@@ -3821,7 +6167,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label>مستودع الاستلام:</label>
+                        <label>مستودع الاستلام: <span style="color:#ef4444">*</span></label>
                         <select name="warehouse_id" class="form-control" required>
                             @foreach($warehouses as $wh)
                             <option value="{{ $wh->id }}">{{ $wh->name }}</option>
@@ -3830,44 +6176,238 @@
                     </div>
 
                     <div class="form-group">
-                        <label>تاريخ الأمر:</label>
+                        <label>تاريخ الأمر: <span style="color:#ef4444">*</span></label>
                         <input type="date" name="order_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>رقم فاتورة المورد:</label>
+                        <input type="text" name="vendor_invoice_number" class="form-control" placeholder="اختياري (INV-XXX)">
                     </div>
                 </div>
 
-                <div style="margin-top: 1rem; margin-bottom: 1rem;">
-                    <label style="font-weight: 700; color: #38bdf8; display: block; margin-bottom: 0.5rem;">الأصناف والمشتريات المطلوبة من المورد:</label>
-                    
-                    <div class="pos-item-box">
-                        <div class="form-row" style="grid-template-columns: 3fr 1.5fr 1.5fr;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label>الصنف:</label>
-                                <select name="items[0][product_id]" class="form-control" required>
-                                    @foreach($products as $pr)
-                                    <option value="{{ $pr->id }}">{{ $pr->name_ar }} ({{ $pr->sku }}) - تكلفة: {{ number_format($pr->cost_price, 2) }} ر.س</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label>الكمية المطلوبة:</label>
-                                <input type="number" name="items[0][quantity]" class="form-control num" value="50" min="1" required>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label>سعر التكلفة المتفق عليه:</label>
-                                <input type="number" step="0.01" name="items[0][unit_price]" class="form-control num" value="5.00" required>
-                            </div>
+                <!-- لوحة إضافة مورد مضمنة -->
+                <div id="inlineAddSupplierPanel" style="display:none; background:#f0f9ff; border:1px solid #bae6fd;
+                     border-radius:10px; padding:1rem 1.2rem; margin-bottom:1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem;">
+                        <strong style="color:#0284c7; font-size:14px;">إضافة مورد جديد</strong>
+                        <button type="button" onclick="closeAddSupplierInlinePanel()"
+                            style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">اسم المورد: *</label>
+                            <input type="text" id="inlineSupName" class="form-control" placeholder="شركة ...">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">رقم الجوال: *</label>
+                            <input type="text" id="inlineSupPhone" class="form-control" placeholder="05XXXXXXXX">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">كود المورد:</label>
+                            <input type="text" id="inlineSupCode" class="form-control" placeholder="SUP-XXXX">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">الرقم الضريبي:</label>
+                            <input type="text" id="inlineSupTax" class="form-control" placeholder="3XXXXXXX03">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">الشخص المسؤول:</label>
+                            <input type="text" id="inlineSupContact" class="form-control" placeholder="اسم المسؤول">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">البريد الإلكتروني:</label>
+                            <input type="email" id="inlineSupEmail" class="form-control" placeholder="supplier@example.com">
+                        </div>
+                    </div>
+                    <div style="text-align:left; margin-top:0.6rem;">
+                        <button type="button" onclick="saveInlineSupplier()"
+                            style="background:linear-gradient(135deg,#0284c7,#0369a1); color:#fff; border:none;
+                                   padding:7px 20px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700;">
+                            حفظ المورد وتحديد تلقائي
+                        </button>
+                    </div>
+                </div>
+
+                <!-- قسم الأصناف -->
+                <div style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem;">
+                        <label style="font-weight: 700; color: #38bdf8; margin:0;">
+                            الأصناف والمشتريات المطلوبة من المورد:
+                        </label>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" onclick="poAddItem()"
+                                style="background:#0f172a; color:#fff; border:none; border-radius:8px;
+                                       padding:5px 14px; cursor:pointer; font-size:12px; font-weight:700;">
+                                + إضافة صنف
+                            </button>
+                            <button type="button" onclick="openAddProductInlinePanel()"
+                                style="background:none; color:#0284c7; border:1px solid #bae6fd; border-radius:8px;
+                                       padding:5px 12px; cursor:pointer; font-size:12px;">
+                                + صنف جديد في النظام
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- رأس الجدول -->
+                    <div style="display:grid; grid-template-columns:3fr 1fr 1.3fr 1.3fr 0.4fr;
+                                gap:6px; padding:6px 10px; background:#0f172a; border-radius:8px 8px 0 0;
+                                color:#fff; font-size:12px; font-weight:700; text-align:right;">
+                        <span>الصنف</span>
+                        <span style="text-align:center;">الكمية</span>
+                        <span style="text-align:center;">سعر الوحدة (ر.س)</span>
+                        <span style="text-align:center;">الإجمالي (ر.س)</span>
+                        <span></span>
+                    </div>
+
+                    <!-- حاوية الأصناف الديناميكية -->
+                    <div id="poItemsContainer" style="border:1px solid #e2e8f0; border-top:none; border-radius:0 0 8px 8px;">
+                    </div>
+                </div>
+
+                <!-- لوحة إضافة صنف جديد مضمنة -->
+                <div id="inlineAddProductPanel" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0;
+                     border-radius:10px; padding:1rem 1.2rem; margin-bottom:1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem;">
+                        <strong style="color:#15803d; font-size:14px;">✨ إضافة صنف جديد في النظام</strong>
+                        <button type="button" onclick="closeAddProductInlinePanel()"
+                            style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">اسم الصنف (عربي): *</label>
+                            <input type="text" id="inlineProdNameAr" class="form-control" placeholder="اسم الصنف بالعربية">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">كود SKU (يولد تلقائياً إن ترك فارغاً):</label>
+                            <input type="text" id="inlineProdSku" class="form-control" placeholder="FLT-XXX-001">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">نوع الصنف: *</label>
+                            <select id="inlineProdType" class="form-control" style="font-size:12px;">
+                                <option value="filter_cartridge">فلتر مياه / شمعة فلتر (filter_cartridge)</option>
+                                <option value="water_device">محطة تحلية / جهاز مياه (water_device)</option>
+                                <option value="membrane">غشاء ممبرين (membrane)</option>
+                                <option value="pump">مضخة مياه (pump)</option>
+                                <option value="spare_part">قطعة غيار (spare_part)</option>
+                                <option value="service">خدمة صيانة (service)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">التصنيف (اختياري):</label>
+                            <select id="inlineProdCategory" class="form-control" style="font-size:12px;">
+                                <option value="">-- بدون تصنيف --</option>
+                                @foreach($categories as $cat)
+                                <option value="{{ $cat->id }}">{{ $cat->name_ar }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">سعر التكلفة المتفق عليه (ر.س):</label>
+                            <input type="number" step="0.01" id="inlineProdCost" class="form-control" placeholder="0.00" value="0.00">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label style="font-size:12px;">سعر البيع المقترح (ر.س):</label>
+                            <input type="number" step="0.01" id="inlineProdPrice" class="form-control" placeholder="0.00" value="0.00">
+                        </div>
+                    </div>
+                    <div style="text-align:left; margin-top:0.6rem;">
+                        <button type="button" onclick="saveInlineProduct()" id="btnSaveInlineProd"
+                            style="background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none;
+                                   padding:7px 20px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700;">
+                            حفظ الصنف وإدراجه في أمر الشراء
+                        </button>
+                    </div>
+                </div>
+
+                <!-- الملاحظات + الإجماليات -->
+                <div class="form-row" style="margin-top:1rem; align-items:start;">
+                    <div class="form-group">
+                        <label>شروط التوريد وملاحظات:</label>
+                        <textarea name="notes" class="form-control" rows="4"
+                            placeholder="شروط التسليم والدفع..."></textarea>
+                    </div>
+
+                    <!-- ملخص الإجماليات -->
+                    <div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1rem;">
+                            <table style="width:100%; border-collapse:collapse;">
+                                <tr>
+                                    <td style="padding:5px 0; color:#64748b; font-size:13px;">إجمالي الكميات:</td>
+                                    <td style="text-align:left; font-weight:700; font-size:13px; font-family:'Outfit',sans-serif;">
+                                        <span id="poTotalQty">0</span> وحدة
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 0; color:#64748b; font-size:13px;">المجموع قبل الضريبة:</td>
+                                    <td style="text-align:left; font-weight:700; font-size:13px; font-family:'Outfit',sans-serif;">
+                                        <span id="poSubtotal">0.00</span> ر.س
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 0; color:#64748b; font-size:13px;">ضريبة القيمة المضافة:</td>
+                                    <td style="text-align:left;">
+                                        <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;">
+                                            <input type="number" id="poTaxRate" name="tax_percent" value="15" min="0" max="100" step="0.5"
+                                                oninput="poRecalcTotals()"
+                                                style="width:65px; padding:4px 8px; border:1px solid #cbd5e1;
+                                                       border-radius:6px; font-size:13px; font-family:'Outfit',sans-serif; font-weight:700; text-align:center;">
+                                            <span style="font-size:13px; color:#64748b;">%</span>
+                                            <button type="button" onclick="setPoTaxRate(15)" style="background:rgba(2,132,199,0.1);color:#0284c7;border:1px solid #bae6fd;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">15%</button>
+                                            <button type="button" onclick="setPoTaxRate(0)" style="background:rgba(100,116,139,0.1);color:#64748b;border:1px solid #cbd5e1;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">0%</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 0; color:#64748b; font-size:13px;">قيمة الضريبة:</td>
+                                    <td style="text-align:left; font-weight:700; font-size:13px; font-family:'Outfit',sans-serif; color:#f59e0b;">
+                                        <span id="poTaxAmount">0.00</span> ر.س
+                                    </td>
+                                </tr>
+                                <tr><td colspan="2"><div style="border-top:2px solid #0284c7; margin:6px 0;"></div></td></tr>
+                                <tr>
+                                    <td style="padding:5px 0; font-weight:800; font-size:15px; color:#0f172a;">الإجمالي الكلي:</td>
+                                    <td style="text-align:left; font-weight:800; font-size:17px;
+                                               font-family:'Outfit',sans-serif; color:#0284c7;">
+                                        <span id="poGrandTotal">0.00</span> ر.س
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>شروط التوريد وملاحظات:</label>
-                    <textarea name="notes" class="form-control" rows="2" placeholder="شروط التسليم والدفع..."></textarea>
-                </div>
-
-                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+                <!-- أزرار الإجراء -->
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; flex-wrap:wrap; align-items:center;">
                     <button type="button" class="btn btn-outline" onclick="closeModal('newPurchaseOrderModal')">إلغاء</button>
-                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #0369a1);">حفظ واعتماد المشتريات</button>
+                    <button type="button" onclick="poPrintPreview()"
+                        style="background:#0f172a; color:#fff; border:none; border-radius:10px;
+                               padding:0.55rem 1.3rem; cursor:pointer; font-size:14px; font-weight:700;
+                               display:inline-flex; align-items:center; gap:7px;">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                        </svg>
+                        طباعة مسودة فورية
+                    </button>
+                    <button type="submit" name="save_and_print" value="1" class="btn btn-primary"
+                        style="background: linear-gradient(135deg, #0284c7, #0891b2); display:inline-flex; align-items:center; gap:6px;">
+                        <span>💾🖨️</span>
+                        حفظ وطباعة رسمية
+                    </button>
+                    <button type="submit" class="btn btn-primary"
+                        style="background: linear-gradient(135deg, #10b981, #059669); display:inline-flex; align-items:center; gap:6px;">
+                        <span>✓</span>
+                        حفظ واعتماد المشتريات
+                    </button>
                 </div>
             </form>
         </div>
@@ -4690,6 +7230,7 @@
     <!-- ================= JAVASCRIPT LOGIC ================= -->
     <script>
         const tabTitles = {
+            'hr': 'بوابة الموارد البشرية وإدارة الكادر',
             'overview': 'لوحة المؤشرات والتشغيل العام',
             'appointments': 'إضافة وجدولة مواعيد العملاء والفنيين',
             'lifecycle': 'محرك استحقاقات الفلاتر والمواعيد',
@@ -4788,6 +7329,136 @@
 
             document.getElementById('suppliers-sub-directory').style.display = (subId === 'directory') ? 'block' : 'none';
             document.getElementById('suppliers-sub-orders').style.display = (subId === 'orders') ? 'block' : 'none';
+            filterProcurementTable();
+        }
+
+        // ==========================================
+        // فلتر البحث لشاشة المبيعات (رقم الفاتورة / رقم العميل أو اسمه)
+        // ==========================================
+        function filterSalesInvoicesTable() {
+            const invQuery = (document.getElementById('salesSearchInvoiceNo')?.value || '').trim().toLowerCase();
+            const custQuery = (document.getElementById('salesSearchCustomer')?.value || '').trim().toLowerCase();
+            const countBadge = document.getElementById('salesFilterCount');
+
+            const rows = document.querySelectorAll('#sales-sub-invoices tbody tr');
+            let visibleCount = 0;
+            let totalRows = 0;
+
+            rows.forEach(row => {
+                // استثناء صف لا توجد بيانات
+                if (row.cells.length <= 1) return;
+                totalRows++;
+
+                const invNoCell = (row.cells[0]?.textContent || '').trim().toLowerCase();
+                const custCell = (row.cells[1]?.textContent || '').trim().toLowerCase();
+
+                const matchInv = !invQuery || invNoCell.includes(invQuery);
+                const matchCust = !custQuery || custCell.includes(custQuery);
+
+                if (matchInv && matchCust) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (countBadge) {
+                if (invQuery || custQuery) {
+                    countBadge.textContent = `(النتائج: ${visibleCount} من ${totalRows})`;
+                    countBadge.style.color = visibleCount > 0 ? '#10b981' : '#ef4444';
+                } else {
+                    countBadge.textContent = '';
+                }
+            }
+        }
+
+        function resetSalesInvoiceFilter() {
+            const inp1 = document.getElementById('salesSearchInvoiceNo');
+            const inp2 = document.getElementById('salesSearchCustomer');
+            if (inp1) inp1.value = '';
+            if (inp2) inp2.value = '';
+            filterSalesInvoicesTable();
+        }
+
+        // ==========================================
+        // فلتر البحث لشاشة المشتريات والموردين (رقم أمر الشراء / كود أو رقم المورد أو اسمه)
+        // ==========================================
+        function filterProcurementTable() {
+            const poQuery = (document.getElementById('procSearchPoNo')?.value || '').trim().toLowerCase();
+            const supQuery = (document.getElementById('procSearchSupplier')?.value || '').trim().toLowerCase();
+            const countBadge = document.getElementById('procFilterCount');
+
+            // 1. فلترة جدول أوامر الشراء
+            const poRows = document.querySelectorAll('#suppliers-sub-orders tbody tr');
+            let poVisibleCount = 0;
+            let poTotalCount = 0;
+
+            poRows.forEach(row => {
+                if (row.cells.length <= 1) return;
+                poTotalCount++;
+
+                const poNoCell = (row.cells[0]?.textContent || '').trim().toLowerCase();
+                const supCell = (row.cells[1]?.textContent || '').trim().toLowerCase();
+
+                const matchPo = !poQuery || poNoCell.includes(poQuery);
+                const matchSup = !supQuery || supCell.includes(supQuery);
+
+                if (matchPo && matchSup) {
+                    row.style.display = '';
+                    poVisibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // 2. فلترة جدول دليل الموردين
+            const dirRows = document.querySelectorAll('#suppliers-sub-directory tbody tr');
+            let dirVisibleCount = 0;
+            let dirTotalCount = 0;
+
+            dirRows.forEach(row => {
+                if (row.cells.length <= 1) return;
+                dirTotalCount++;
+
+                const codeCell = (row.cells[0]?.textContent || '').trim().toLowerCase();
+                const nameCell = (row.cells[1]?.textContent || '').trim().toLowerCase();
+                const phoneCell = (row.cells[3]?.textContent || '').trim().toLowerCase();
+                const taxCell = (row.cells[5]?.textContent || '').trim().toLowerCase();
+
+                const matchCodeOrPo = !poQuery || codeCell.includes(poQuery);
+                const matchSup = !supQuery || nameCell.includes(supQuery) || phoneCell.includes(supQuery) || codeCell.includes(supQuery) || taxCell.includes(supQuery);
+
+                if (matchCodeOrPo && matchSup) {
+                    row.style.display = '';
+                    dirVisibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (countBadge) {
+                if (poQuery || supQuery) {
+                    const isOrdersVisible = document.getElementById('suppliers-sub-orders')?.style.display !== 'none';
+                    if (isOrdersVisible) {
+                        countBadge.textContent = `(أوامر الشراء المطابقة: ${poVisibleCount} من ${poTotalCount})`;
+                        countBadge.style.color = poVisibleCount > 0 ? '#0284c7' : '#ef4444';
+                    } else {
+                        countBadge.textContent = `(الموردين المطابقين: ${dirVisibleCount} من ${dirTotalCount})`;
+                        countBadge.style.color = dirVisibleCount > 0 ? '#0284c7' : '#ef4444';
+                    }
+                } else {
+                    countBadge.textContent = '';
+                }
+            }
+        }
+
+        function resetProcurementFilter() {
+            const inp1 = document.getElementById('procSearchPoNo');
+            const inp2 = document.getElementById('procSearchSupplier');
+            if (inp1) inp1.value = '';
+            if (inp2) inp2.value = '';
+            filterProcurementTable();
         }
 
         // Role Permissions Load & Form Update
@@ -4823,7 +7494,31 @@
         // Modal Controls
         function openNewSaleModal() { document.getElementById('newSaleModal').classList.add('active'); }
         function openNewSupplierModal() { document.getElementById('newSupplierModal').classList.add('active'); }
-        function openNewPurchaseOrderModal() { document.getElementById('newPurchaseOrderModal').classList.add('active'); }
+        function openNewProductModal() { document.getElementById('newProductModal').classList.add('active'); }
+
+        function openEditProductModal(p) {
+            document.getElementById('editProductForm').action = '/products/' + p.id + '/update';
+            document.getElementById('editProdNameAr').value = p.name_ar || '';
+            document.getElementById('editProdNameEn').value = p.name_en || '';
+            document.getElementById('editProdSku').value = p.sku || '';
+            document.getElementById('editProdBarcode').value = p.barcode || '';
+            document.getElementById('editProdType').value = p.type || 'water_device';
+            document.getElementById('editProdIsCompound').value = p.is_compound ? '1' : '0';
+            document.getElementById('editProdCreatedAt').value = p.created_at || '';
+            document.getElementById('editProdCategory').value = p.category_id || '';
+            document.getElementById('editProdUnit').value = p.unit || 'قطعة';
+            document.getElementById('editProdCostPrice').value = p.cost_price || 0;
+            document.getElementById('editProdSellingPrice').value = p.selling_price || 0;
+            document.getElementById('editProductModal').classList.add('active');
+        }
+        function openNewPurchaseOrderModal() {
+            document.getElementById('newPurchaseOrderModal').classList.add('active');
+            // تهيئة الأصناف عند أول فتح
+            if (document.getElementById('poItemsContainer').children.length === 0) {
+                poAddItem();
+            }
+            poRecalcTotals();
+        }
         function openNewRoleModal() { document.getElementById('newRoleModal').classList.add('active'); }
         function openNewUserModal() { document.getElementById('newUserModal').classList.add('active'); }
         function openNewPermissionModal() { document.getElementById('newPermissionModal').classList.add('active'); }
@@ -4834,6 +7529,331 @@
             const sel = document.getElementById('poSupplierSelector');
             if (sel) sel.value = supplierId;
         }
+
+        // ============================================================
+        // Purchase Order - Inline Supplier Panel
+        // ============================================================
+        function openAddSupplierInlinePanel() {
+            document.getElementById('inlineAddSupplierPanel').style.display = 'block';
+        }
+        function closeAddSupplierInlinePanel() {
+            document.getElementById('inlineAddSupplierPanel').style.display = 'none';
+            ['inlineSupName','inlineSupPhone','inlineSupCode','inlineSupTax','inlineSupContact','inlineSupEmail']
+                .forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        }
+        function saveInlineSupplier() {
+            var name  = document.getElementById('inlineSupName').value.trim();
+            var phone = document.getElementById('inlineSupPhone').value.trim();
+            if (!name || !phone) { alert('يرجى إدخال اسم المورد ورقم الجوال على الأقل.'); return; }
+            var code  = document.getElementById('inlineSupCode').value.trim();
+            var token = document.querySelector('#poMainForm input[name="_token"]') ? document.querySelector('#poMainForm input[name="_token"]').value : '';
+            var btn   = document.querySelector('[onclick="saveInlineSupplier()"]');
+            if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
+            var formData = new FormData();
+            formData.append('_token', token);
+            formData.append('name', name);
+            formData.append('phone', phone);
+            if (code) formData.append('supplier_code', code);
+            formData.append('tax_number', document.getElementById('inlineSupTax').value.trim());
+            formData.append('contact_person', document.getElementById('inlineSupContact').value.trim());
+            formData.append('email', document.getElementById('inlineSupEmail').value.trim());
+            fetch('/suppliers/create', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: formData
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (btn) { btn.disabled = false; btn.textContent = 'حفظ المورد وتحديد تلقائي'; }
+                if (data.success && data.supplier) {
+                    var sel = document.getElementById('poSupplierSelector');
+                    var opt = document.createElement('option');
+                    opt.value = data.supplier.id;
+                    opt.text = data.supplier.name + ' (' + data.supplier.supplier_code + ')';
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                    sel.value = data.supplier.id;
+                    closeAddSupplierInlinePanel();
+                    alert('تمت إضافة المورد (' + data.supplier.name + ') وتحديده في أمر الشراء بنجاح!');
+                } else {
+                    alert(data.message || 'حدث خطأ أثناء حفظ المورد.');
+                }
+            })
+            .catch(function() {
+                if (btn) { btn.disabled = false; btn.textContent = 'حفظ المورد وتحديد تلقائي'; }
+                alert('حدث خطأ في الاتصال بالخادم. يرجى التحقق من البيانات.');
+            });
+        }
+
+        // ============================================================
+        // Purchase Order - Inline Product Panel
+        // ============================================================
+        function openAddProductInlinePanel() {
+            document.getElementById('inlineAddProductPanel').style.display = 'block';
+        }
+        function closeAddProductInlinePanel() {
+            document.getElementById('inlineAddProductPanel').style.display = 'none';
+            ['inlineProdNameAr','inlineProdSku','inlineProdCost','inlineProdPrice']
+                .forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        }
+        function saveInlineProduct() {
+            var nameAr = document.getElementById('inlineProdNameAr').value.trim();
+            if (!nameAr) {
+                alert('يرجى إدخال اسم الصنف بالعربية على الأقل.');
+                return;
+            }
+            var sku = document.getElementById('inlineProdSku').value.trim();
+            var type = document.getElementById('inlineProdType') ? document.getElementById('inlineProdType').value : 'filter_cartridge';
+            var catEl = document.getElementById('inlineProdCategory');
+            var catId = catEl ? catEl.value : '';
+            var cost = parseFloat(document.getElementById('inlineProdCost').value) || 0;
+            var price = parseFloat(document.getElementById('inlineProdPrice').value) || 0;
+            var token = document.querySelector('#poMainForm input[name="_token"]') ? document.querySelector('#poMainForm input[name="_token"]').value : '';
+            var btn = document.getElementById('btnSaveInlineProd') || document.querySelector('[onclick="saveInlineProduct()"]');
+            if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
+
+            var formData = new FormData();
+            formData.append('_token', token);
+            formData.append('name_ar', nameAr);
+            if (sku) formData.append('sku', sku);
+            formData.append('type', type);
+            if (catId) formData.append('category_id', catId);
+            formData.append('cost_price', cost);
+            formData.append('selling_price', price);
+
+            fetch('/products/create', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: formData
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (btn) { btn.disabled = false; btn.textContent = 'حفظ الصنف وإدراجه في أمر الشراء'; }
+                if (data.success && data.product) {
+                    var p = data.product;
+                    var itemObj = {
+                        id: p.id,
+                        name: p.name_ar + ' (' + p.sku + ')',
+                        cost: parseFloat(p.cost_price || cost)
+                    };
+                    poAvailableProducts.push(itemObj);
+
+                    // Add new option to all existing product dropdowns
+                    document.querySelectorAll('.po-product-select').forEach(function(sel) {
+                        var opt = document.createElement('option');
+                        opt.value = itemObj.id;
+                        opt.setAttribute('data-cost', itemObj.cost);
+                        opt.text = itemObj.name;
+                        sel.appendChild(opt);
+                    });
+
+                    // Select in the current row or append a new row
+                    var rows = document.querySelectorAll('#poItemsContainer [id^="poRow_"]');
+                    if (rows.length > 0) {
+                        var lastRow = rows[rows.length - 1];
+                        var lastIdx = lastRow.id.replace('poRow_', '');
+                        var lastSel = lastRow.querySelector('.po-product-select');
+                        if (lastSel) {
+                            lastSel.value = itemObj.id;
+                            var priceEl = document.getElementById('poPrice_' + lastIdx);
+                            if (priceEl) priceEl.value = itemObj.cost.toFixed(2);
+                            poUpdateRowTotal(lastIdx);
+                        }
+                    } else {
+                        poAddItem();
+                    }
+
+                    closeAddProductInlinePanel();
+                    alert('تمت إضافة الصنف (' + p.name_ar + ') وإدراجه في أمر الشراء بنجاح!');
+                } else {
+                    alert(data.message || 'حدث خطأ أثناء حفظ الصنف.');
+                }
+            })
+            .catch(function(err) {
+                if (btn) { btn.disabled = false; btn.textContent = 'حفظ الصنف وإدراجه في أمر الشراء'; }
+                alert('حدث خطأ في الاتصال بالخادم.');
+            });
+        }
+
+        // ============================================================
+        // Purchase Order - Dynamic Items
+        // ============================================================
+        var poItemIndex = 0;
+        var poAvailableProducts = @json($products->map(fn($p) => ['id'=>$p->id,'name'=>$p->name_ar.' ('.$p->sku.')','cost'=>(float)$p->cost_price])->values());
+
+        function poAddItem() {
+            var container = document.getElementById('poItemsContainer');
+            var idx = poItemIndex++;
+            var row = document.createElement('div');
+            row.id = 'poRow_' + idx;
+            row.style.cssText = 'display:grid;grid-template-columns:3fr 1fr 1.3fr 1.3fr 0.4fr;gap:6px;padding:8px 10px;border-bottom:1px solid #f1f5f9;align-items:center;';
+            var optionsHtml = '';
+            for (var i = 0; i < poAvailableProducts.length; i++) {
+                var p = poAvailableProducts[i];
+                optionsHtml += '<option value="' + p.id + '" data-cost="' + p.cost + '">' + p.name + '</option>';
+            }
+            var defaultCost = poAvailableProducts.length > 0 ? parseFloat(poAvailableProducts[0].cost).toFixed(2) : '0.00';
+            var removeBtn = idx > 0
+                ? '<button type="button" onclick="poRemoveItem(' + idx + ')" style="background:#fee2e2;color:#991b1b;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1;">&times;</button>'
+                : '<span style="color:#cbd5e1;font-size:18px;">&#8722;</span>';
+            row.innerHTML =
+                '<div><select name="items[' + idx + '][product_id]" class="form-control po-product-select" onchange="poOnProductChange(this,' + idx + ')" required style="font-size:12px;">' + optionsHtml + '</select></div>' +
+                '<div><input type="number" name="items[' + idx + '][quantity]" id="poQty_' + idx + '" class="form-control num po-qty" value="1" min="1" required oninput="poUpdateRowTotal(' + idx + ')" style="text-align:center;font-size:13px;"></div>' +
+                '<div><input type="number" step="0.01" name="items[' + idx + '][unit_price]" id="poPrice_' + idx + '" class="form-control num po-price" value="' + defaultCost + '" min="0" required oninput="poUpdateRowTotal(' + idx + ')" style="text-align:center;font-size:13px;"></div>' +
+                '<div style="text-align:center;font-weight:700;font-family:Outfit,sans-serif;color:#0284c7;font-size:14px;"><span id="poRowTotal_' + idx + '">0.00</span> ر.س</div>' +
+                '<div style="text-align:center;">' + removeBtn + '</div>';
+            container.appendChild(row);
+            poUpdateRowTotal(idx);
+        }
+
+        function poOnProductChange(sel, idx) {
+            var opt = sel.options[sel.selectedIndex];
+            var cost = opt ? parseFloat(opt.getAttribute('data-cost')) || 0 : 0;
+            var priceInput = document.getElementById('poPrice_' + idx);
+            if (priceInput) priceInput.value = cost.toFixed(2);
+            poUpdateRowTotal(idx);
+        }
+
+        function poUpdateRowTotal(idx) {
+            var qtyEl   = document.getElementById('poQty_'   + idx);
+            var priceEl = document.getElementById('poPrice_' + idx);
+            var qty     = qtyEl   ? parseFloat(qtyEl.value)   || 0 : 0;
+            var price   = priceEl ? parseFloat(priceEl.value) || 0 : 0;
+            var el      = document.getElementById('poRowTotal_' + idx);
+            if (el) el.textContent = (qty * price).toFixed(2);
+            poRecalcTotals();
+        }
+
+        function poRemoveItem(idx) {
+            var row = document.getElementById('poRow_' + idx);
+            if (row) { row.remove(); poRecalcTotals(); }
+        }
+
+        function setPoTaxRate(val) {
+            var el = document.getElementById('poTaxRate');
+            if (el) { el.value = val; poRecalcTotals(); }
+        }
+
+        function poRecalcTotals() {
+            var totalQty = 0, subtotal = 0;
+            document.querySelectorAll('#poItemsContainer [id^="poRow_"]').forEach(function(row) {
+                var idxStr  = row.id.replace('poRow_', '');
+                var qtyEl   = document.getElementById('poQty_'   + idxStr);
+                var priceEl = document.getElementById('poPrice_' + idxStr);
+                var qty     = qtyEl   ? parseFloat(qtyEl.value)   || 0 : 0;
+                var price   = priceEl ? parseFloat(priceEl.value) || 0 : 0;
+                totalQty += qty; subtotal += qty * price;
+            });
+            var taxRateEl  = document.getElementById('poTaxRate');
+            var taxRate    = taxRateEl ? parseFloat(taxRateEl.value) || 0 : 15;
+            var taxAmount  = subtotal * (taxRate / 100);
+            var grandTotal = subtotal + taxAmount;
+            var fmt = function(v) { return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+            if (document.getElementById('poTotalQty'))   document.getElementById('poTotalQty').textContent   = totalQty;
+            if (document.getElementById('poSubtotal'))   document.getElementById('poSubtotal').textContent   = fmt(subtotal);
+            if (document.getElementById('poTaxAmount'))  document.getElementById('poTaxAmount').textContent  = fmt(taxAmount);
+            if (document.getElementById('poGrandTotal')) document.getElementById('poGrandTotal').textContent = fmt(grandTotal);
+            var taxHidden = document.getElementById('poHiddenTaxAmount');
+            if (taxHidden) taxHidden.value = taxAmount.toFixed(2);
+        }
+
+        // ============================================================
+        // Purchase Order - Print Preview
+        // ============================================================
+        function poPrintPreview() {
+            var supplierSel = document.getElementById('poSupplierSelector');
+            var supplierName = (supplierSel && supplierSel.options[supplierSel.selectedIndex]) ? supplierSel.options[supplierSel.selectedIndex].text : 'غير محدد';
+            var taxRateEl  = document.getElementById('poTaxRate');
+            var taxRate    = taxRateEl ? parseFloat(taxRateEl.value) || 0 : 15;
+            var rows       = '', totalQty = 0, subtotal = 0, lineIdx = 1;
+
+            document.querySelectorAll('#poItemsContainer [id^="poRow_"]').forEach(function(row) {
+                var idxStr  = row.id.replace('poRow_', '');
+                var sel     = row.querySelector('.po-product-select');
+                var name    = (sel && sel.options[sel.selectedIndex]) ? sel.options[sel.selectedIndex].text : 'صنف';
+                var qtyEl   = document.getElementById('poQty_'   + idxStr);
+                var priceEl = document.getElementById('poPrice_' + idxStr);
+                var qty     = qtyEl   ? parseFloat(qtyEl.value)   || 0 : 0;
+                var price   = priceEl ? parseFloat(priceEl.value) || 0 : 0;
+                var total   = qty * price;
+                totalQty += qty; subtotal += total;
+                rows += '<tr>' +
+                    '<td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;color:#64748b;">' + lineIdx++ + '</td>' +
+                    '<td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">' + name + '</td>' +
+                    '<td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0284c7;">' + qty + '</td>' +
+                    '<td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:left;">' + price.toFixed(2) + ' ر.س</td>' +
+                    '<td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:700;">' + total.toFixed(2) + ' ر.س</td>' +
+                    '</tr>';
+            });
+
+            var taxAmount  = subtotal * (taxRate / 100);
+            var grandTotal = subtotal + taxAmount;
+            var fmt     = function(v) { return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+            var dateEl  = document.querySelector('[name="order_date"]');
+            var notesEl = document.querySelector('[name="notes"]');
+            var orderDate = dateEl  ? dateEl.value  : '';
+            var notes     = notesEl ? notesEl.value : '';
+
+            var htmlParts = [
+                '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">',
+                '<title>معاينة أمر الشراء</title>',
+                '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">',
+                '<style>',
+                '*{box-sizing:border-box;margin:0;padding:0;font-family:Cairo,sans-serif;}',
+                'body{padding:20px;background:#f8fafc;color:#0f172a;}',
+                '.act{background:#0f172a;color:#fff;padding:10px 20px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}',
+                '.bp{background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff;border:none;padding:7px 20px;border-radius:7px;cursor:pointer;font-size:14px;font-weight:700;}',
+                '.doc{max-width:820px;margin:0 auto;background:#fff;padding:30px 35px;border:1px solid #e2e8f0;border-radius:10px;}',
+                '.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #0284c7;padding-bottom:16px;margin-bottom:20px;}',
+                'h1{color:#0284c7;font-size:22px;font-weight:800;}',
+                'table{width:100%;border-collapse:collapse;}',
+                'th{background:#0f172a;color:#fff;padding:9px 12px;text-align:right;font-size:12px;}',
+                '.meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}',
+                '.mb{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;}',
+                '.mb h3{font-size:12px;color:#0284c7;font-weight:700;border-bottom:1px dashed #cbd5e1;padding-bottom:5px;margin-bottom:8px;}',
+                '.mb td{font-size:12px;padding:3px 0;}.lbl{color:#64748b;width:40%;}',
+                '.tb{width:300px;float:left;margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}',
+                '.tr2 td{padding:7px 12px;font-size:13px;}.tl{color:#64748b;font-weight:600;}.tv{font-weight:700;text-align:left;}',
+                '.gt td{background:#0284c7;color:#fff!important;font-weight:800;font-size:15px;}',
+                '@media print{.act{display:none;}body{background:#fff;}.doc{border:none;}}',
+                '</style></head><body>',
+                '<div class="act"><strong>معاينة أمر الشراء</strong>',
+                '<button class="bp" onclick="window.print()">طباعة / PDF</button></div>',
+                '<div class="doc">',
+                '<div class="hdr">',
+                '<div><h1>تقنية الفلاتر للتجارة والمقاولات</h1>',
+                '<p style="color:#64748b;font-size:12px;">FilterTech ERP - Procurement</p></div>',
+                '<div style="text-align:left;">',
+                '<div style="font-size:18px;font-weight:800;">أمر شراء (PO) - مسودة معاينة</div>',
+                '<div style="font-size:12px;color:#64748b;margin-top:4px;">تاريخ: ' + orderDate + '</div></div></div>',
+                '<div class="meta">',
+                '<div class="mb"><h3>بيانات المورد</h3>',
+                '<table><tr><td class="lbl">المورد:</td><td style="font-weight:700;">' + supplierName + '</td></tr></table></div>',
+                '<div class="mb"><h3>ملخص الطلب</h3>',
+                '<table><tr><td class="lbl">عدد الاصناف:</td><td style="font-weight:700;">' + (lineIdx - 1) + ' صنف</td></tr>',
+                '<tr><td class="lbl">اجمالي الكميات:</td><td style="font-weight:700;">' + totalQty + ' وحدة</td></tr></table></div></div>',
+                '<table style="margin-bottom:20px;"><thead><tr>',
+                '<th style="width:5%;">#</th><th style="width:45%;">الصنف</th>',
+                '<th style="width:15%;text-align:center;">الكمية</th>',
+                '<th style="width:17%;text-align:left;">سعر الوحدة</th>',
+                '<th style="width:18%;text-align:left;">الاجمالي</th>',
+                '</tr></thead><tbody>',
+                rows || '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">لا توجد اصناف</td></tr>',
+                '</tbody></table>',
+                '<div style="display:flex;justify-content:flex-end;">',
+                '<table class="tb">',
+                '<tr class="tr2"><td class="tl">المجموع قبل الضريبة:</td><td class="tv">' + fmt(subtotal) + ' ر.س</td></tr>',
+                '<tr class="tr2"><td class="tl">ضريبة (' + taxRate + 'بالمئة):</td><td class="tv">' + fmt(taxAmount) + ' ر.س</td></tr>',
+                '<tr class="gt tr2"><td class="tl">الاجمالي الكلي:</td><td class="tv">' + fmt(grandTotal) + ' ر.س</td></tr>',
+                '</table></div>',
+                notes ? '<div style="margin-top:24px;background:#f8fafc;border-right:4px solid #0284c7;padding:10px 14px;border-radius:4px;font-size:12.5px;color:#334155;"><strong>ملاحظات:</strong> ' + notes + '</div>' : '',
+                '</div></body></html>'
+            ];
+            var w = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+            w.document.write(htmlParts.join(''));
+            w.document.close();
+        }
+
 
         function openPaymentModal(invoiceId, invoiceNumber, balanceDue) {
             document.getElementById('payInvoiceNum').innerText = invoiceNumber;
@@ -4912,9 +7932,21 @@
             }
         }
 
+        function openModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) {
+                m.classList.add('active');
+                m.style.display = 'flex';
+                m.style.zIndex = '99999';
+            }
+        }
+
         function closeModal(modalId) {
             const m = document.getElementById(modalId);
-            if (m) m.classList.remove('active');
+            if (m) {
+                m.classList.remove('active');
+                m.style.display = 'none';
+            }
         }
 
         // Customers & Stations Helpers
@@ -5139,9 +8171,263 @@
         let posRowIndex = 1;
         const availableProducts = [
             @foreach($products as $p)
-            { id: {{ $p->id }}, sku: "{{ $p->sku }}", name: "{{ $p->name_ar }}", price: {{ (float)$p->selling_price }} },
+            { id: {{ $p->id }}, sku: "{{ $p->sku }}", barcode: "{{ $p->barcode ?? '' }}", name: "{{ $p->name_ar }}", price: {{ (float)$p->selling_price }} },
             @endforeach
         ];
+
+        // Barcode search / scan handler
+        function posSearchByBarcode() {
+            const input = document.getElementById('posBarcodeInput');
+            const msg = document.getElementById('posBarcodeMsg');
+            const code = (input ? input.value : '').trim().toLowerCase();
+            if (!code) {
+                if (msg) { msg.textContent = 'يرجى إدخال الباركود أو كود SKU أولاً.'; msg.style.color = '#fb7185'; }
+                return;
+            }
+
+            // Find matching product
+            const prod = availableProducts.find(p => 
+                (p.barcode && p.barcode.toLowerCase() === code) || 
+                (p.sku && p.sku.toLowerCase() === code) ||
+                (p.name && p.name.toLowerCase().includes(code))
+            );
+
+            if (!prod) {
+                if (msg) { msg.textContent = `لم يتم العثور على صنف بالباركود / الكود: "${code}"`; msg.style.color = '#fb7185'; }
+                return;
+            }
+
+            // Check if already in rows
+            let foundRow = null;
+            document.querySelectorAll('#posItemsContainer .pos-item-box').forEach(box => {
+                const sel = box.querySelector('select[name*="[product_id]"]');
+                if (sel && parseInt(sel.value) === prod.id) {
+                    foundRow = box;
+                }
+            });
+
+            if (foundRow) {
+                // Increment qty
+                const qtyInput = foundRow.querySelector('input[name*="[quantity]"]');
+                if (qtyInput) {
+                    qtyInput.value = (parseInt(qtyInput.value) || 0) + 1;
+                }
+                if (msg) { msg.textContent = `✓ تم زيادة كمية: ${prod.name}`; msg.style.color = '#34d399'; }
+            } else {
+                // Check if first row is empty / unselected
+                const firstRow = document.getElementById('posRow_0');
+                const firstSelect = firstRow ? firstRow.querySelector('select[name*="[product_id]"]') : null;
+                if (firstRow && firstSelect && !firstSelect.value) {
+                    firstSelect.value = prod.id;
+                    updatePosItemPrice(0, firstSelect);
+                    if (msg) { msg.textContent = `✓ تم اختيار: ${prod.name}`; msg.style.color = '#34d399'; }
+                } else {
+                    // Add new row with this product
+                    const idx = posRowIndex++;
+                    const container = document.getElementById('posItemsContainer');
+                    let optionsHtml = '<option value="">اختر الصنف...</option>';
+                    availableProducts.forEach(p => {
+                        const selAttr = (p.id === prod.id) ? 'selected' : '';
+                        optionsHtml += `<option value="${p.id}" data-price="${p.price}" ${selAttr}>${p.name} (${p.sku}) — ${p.price.toFixed(2)} ر.س</option>`;
+                    });
+                    const rowHtml = `
+                        <div class="pos-item-box" id="posRow_${idx}">
+                            <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>الصنف:</label>
+                                    <select name="items[${idx}][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(${idx}, this)" required>
+                                        ${optionsHtml}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>سعر الوحدة:</label>
+                                    <input type="number" step="0.01" name="items[${idx}][unit_price]" id="posUnitPrice_${idx}" class="form-control num" value="${prod.price.toFixed(2)}" oninput="calculatePosTotals()" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>الكمية:</label>
+                                    <input type="number" name="items[${idx}][quantity]" id="posQty_${idx}" class="form-control num" value="1" min="1" oninput="calculatePosTotals()" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>الخصم:</label>
+                                    <input type="number" step="0.01" name="items[${idx}][discount]" id="posDisc_${idx}" class="form-control num" value="0.00" oninput="calculatePosTotals()">
+                                </div>
+                                <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removePosItemRow(${idx})">&times;</button>
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', rowHtml);
+                    if (msg) { msg.textContent = `✓ تم إضافة: ${prod.name}`; msg.style.color = '#34d399'; }
+                }
+            }
+
+            calculatePosTotals();
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        // Print preview for POS sale
+        function printPosSalePreview() {
+            const customerType = document.getElementById('saleCustomerType')?.value || 'existing';
+            let customerName = 'عميل نقدي';
+            if (customerType === 'existing') {
+                const custSel = document.querySelector('select[name="customer_id"]');
+                if (custSel && custSel.selectedIndex >= 0) {
+                    customerName = custSel.options[custSel.selectedIndex].text;
+                }
+            } else {
+                customerName = document.querySelector('input[name="new_customer_name"]')?.value || 'عميل جديد';
+            }
+
+            const warehouseSel = document.querySelector('select[name="warehouse_id"]');
+            const warehouseName = warehouseSel && warehouseSel.selectedIndex >= 0 ? warehouseSel.options[warehouseSel.selectedIndex].text : '';
+            const orderDate = document.querySelector('input[name="order_date"]')?.value || new Date().toISOString().slice(0, 10);
+            const notes = document.querySelector('input[name="notes"]')?.value || '';
+            const payMethodSel = document.getElementById('posPaymentMethod');
+            const payMethod = payMethodSel && payMethodSel.selectedIndex >= 0 ? payMethodSel.options[payMethodSel.selectedIndex].text : '';
+
+            let rows = '';
+            let subtotal = 0;
+            let totalDisc = 0;
+            let totalQty = 0;
+            let count = 0;
+
+            document.querySelectorAll('#posItemsContainer .pos-item-box').forEach(box => {
+                const prodSel = box.querySelector('select[name*="[product_id]"]');
+                if (!prodSel || !prodSel.value) return;
+                count++;
+                const prodName = prodSel.options[prodSel.selectedIndex].text;
+                const price = parseFloat(box.querySelector('input[name*="[unit_price]"]')?.value || 0);
+                const qty = parseInt(box.querySelector('input[name*="[quantity]"]')?.value || 1);
+                const disc = parseFloat(box.querySelector('input[name*="[discount]"]')?.value || 0);
+                const lineTotal = (price * qty) - disc;
+
+                subtotal += (price * qty);
+                totalDisc += disc;
+                totalQty += qty;
+
+                rows += `
+                    <tr>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">${count}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${prodName}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">${qty}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left;">${price.toFixed(2)} ر.س</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left;">${disc.toFixed(2)} ر.س</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; font-weight: 700;">${lineTotal.toFixed(2)} ر.س</td>
+                    </tr>
+                `;
+            });
+
+            if (count === 0) {
+                alert('يرجى اختيار صنف واحد على الأقل قبل المعاينة والطباعة.');
+                return;
+            }
+
+            const netSubtotal = Math.max(0, subtotal - totalDisc);
+            const vat = netSubtotal * 0.15;
+            const grandTotal = netSubtotal + vat;
+
+            const printWin = window.open('', '_blank', 'width=850,height=750');
+            printWin.document.write(`
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>معاينة فاتورة مبيعات POS</title>
+                    <style>
+                        body { font-family: 'Cairo', Arial, sans-serif; padding: 25px; color: #1e293b; background: #fff; }
+                        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #10b981; padding-bottom: 15px; margin-bottom: 20px; }
+                        .title { font-size: 22px; font-weight: 800; color: #10b981; }
+                        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; font-size: 13px; }
+                        .meta-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
+                        th { background: #0f172a; color: #fff; padding: 10px; text-align: right; }
+                        .totals-table { width: 320px; margin-right: auto; margin-left: 0; font-size: 13px; }
+                        .totals-table td { padding: 6px 10px; }
+                        .btn-bar { display: flex; justify-content: space-between; margin-bottom: 20px; background: #0f172a; color: #fff; padding: 10px 15px; border-radius: 8px; }
+                        .btn-print { background: #10b981; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 700; }
+                        @media print { .btn-bar { display: none; } body { padding: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="btn-bar">
+                        <span>معاينة طباعة فاتورة مبيعات POS</span>
+                        <button class="btn-print" onclick="window.print()">🖨️ طباعة الفاتورة</button>
+                    </div>
+                    <div class="header">
+                        <div>
+                            <div class="title">تقنية الفلاتر للتجارة والمقاولات</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">نظام نقاط البيع وإدارة الفواتير POS</div>
+                        </div>
+                        <div style="text-align: left;">
+                            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">فاتورة ضريبية مبسطة</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">التاريخ: ${orderDate}</div>
+                        </div>
+                    </div>
+                    <div class="meta-grid">
+                        <div class="meta-card">
+                            <div><strong>العميل:</strong> ${customerName}</div>
+                            <div style="margin-top: 6px;"><strong>طريقة السداد:</strong> ${payMethod}</div>
+                        </div>
+                        <div class="meta-card">
+                            <div><strong>مستودع الصرف:</strong> ${warehouseName}</div>
+                            <div style="margin-top: 6px;"><strong>إجمالي الكميات:</strong> ${totalQty} قطعة</div>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">#</th>
+                                <th style="width: 45%;">الصنف</th>
+                                <th style="width: 10%; text-align: center;">الكمية</th>
+                                <th style="width: 15%; text-align: left;">سعر الوحدة</th>
+                                <th style="width: 10%; text-align: left;">الخصم</th>
+                                <th style="width: 15%; text-align: left;">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 15px; flex-wrap: wrap; gap: 15px;">
+                        <!-- باركود QR ورمز تصوير الفاتورة الضريبية في الطباعة -->
+                        <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #cbd5e1; padding: 10px; border-radius: 8px; background: #f8fafc;">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(`Seller: FilterTech Co.\nVAT: 310999888700003\nDate: ${orderDate}\nTotal: ${grandTotal.toFixed(2)} SAR\nVAT: ${vat.toFixed(2)} SAR`)}" alt="QR" style="width: 90px; height: 90px; display: block;">
+                            <div style="font-size: 11px; color: #475569; line-height: 1.5;">
+                                <strong style="color: #0f172a; font-size: 12px; display: block; margin-bottom: 2px;">رمز التحقق والمسح الضريبي</strong>
+                                <div>الرقم الضريبي: 310999888700003</div>
+                                <div>الإجمالي شامل الضريبة: <strong>${grandTotal.toFixed(2)} ر.س</strong></div>
+                                <div style="color: #10b981; margin-top: 2px;">جاهز للتصوير بكاميرا الجوال</div>
+                            </div>
+                        </div>
+
+                        <table class="totals-table">
+                            <tr>
+                                <td>المجموع قبل الخصم:</td>
+                                <td style="text-align: left; font-weight: 700;">${subtotal.toFixed(2)} ر.س</td>
+                            </tr>
+                            ${totalDisc > 0 ? `<tr><td>إجمالي الخصم:</td><td style="text-align: left; color: #ef4444; font-weight: 700;">-${totalDisc.toFixed(2)} ر.س</td></tr>` : ''}
+                            <tr>
+                                <td>الوعاء الضريبي الخاضع (15%):</td>
+                                <td style="text-align: left; font-weight: 700;">${netSubtotal.toFixed(2)} ر.س</td>
+                            </tr>
+                            <tr>
+                                <td>ضريبة القيمة المضافة (15%):</td>
+                                <td style="text-align: left; font-weight: 700; color: #f59e0b;">${vat.toFixed(2)} ر.س</td>
+                            </tr>
+                            <tr style="background: #10b981; color: #fff; font-weight: 800; font-size: 15px;">
+                                <td>الإجمالي النهائي المستحق:</td>
+                                <td style="text-align: left; color: #fff;">${grandTotal.toFixed(2)} ر.س</td>
+                            </tr>
+                        </table>
+                    </div>
+                    ${notes ? `<div style="margin-top: 20px; padding: 10px; background: #f8fafc; border-right: 3px solid #10b981; font-size: 12px;"><strong>ملاحظات:</strong> ${notes}</div>` : ''}
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        }
 
         function addPosItemRow() {
             const idx = posRowIndex++;
@@ -5218,6 +8504,25 @@
             document.getElementById('posSubtotalDisp').innerText = netSubtotal.toFixed(2);
             document.getElementById('posTaxDisp').innerText = vat.toFixed(2);
             document.getElementById('posGrandTotalDisp').innerText = grandTotal.toFixed(2) + ' ر.س';
+
+            // Update Live QR Code & Barcode under totals
+            const qrImg = document.getElementById('posLiveQrImg');
+            const summaryText = document.getElementById('posBarcodeSummaryText');
+            const linearBarcode = document.getElementById('posLiveLinearBarcode');
+
+            const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+            const qrPayload = encodeURIComponent(`Seller: FilterTech Co.\nVAT: 310999888700003\nDate: ${nowStr}\nSubtotal: ${netSubtotal.toFixed(2)} SAR\nVAT (15%): ${vat.toFixed(2)} SAR\nTotal: ${grandTotal.toFixed(2)} SAR`);
+
+            if (qrImg) {
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${qrPayload}`;
+            }
+            if (summaryText) {
+                summaryText.innerText = `الضريبة: ${vat.toFixed(2)} ر.س | الإجمالي المطلوب: ${grandTotal.toFixed(2)} ر.س`;
+            }
+            if (linearBarcode) {
+                const totalClean = grandTotal.toFixed(2).replace('.', '');
+                linearBarcode.src = `https://bwipjs-api.metafloor.com/?bcid=code128&text=POS${totalClean}&scale=2&height=8&includetext=false`;
+            }
 
             const method = document.getElementById('posPaymentMethod').value;
             const paidInput = document.getElementById('posPaidAmount');
@@ -5316,7 +8621,529 @@
                     f.appendChild(inp);
                 }
             });
+
+            @if(session('print_po_url'))
+                window.open('{{ session('print_po_url') }}', '_blank');
+            @endif
         });
-    </script>
+    
+                // =============================================
+        // تتبع الفنيين - Technician Trips & Live Maps JS
+        // =============================================
+        let _trackingMap = null;
+        let _pickerMap = null;
+        let _pickerMarker = null;
+        let _mapMarkers = [];
+        let _allTripsData = @json($technicianTrips ?? []);
+        let _rOdoStart = 0;
+
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && meta.content) return meta.content;
+            const input = document.querySelector('input[name="_token"]');
+            if (input && input.value) return input.value;
+            return '';
+        }
+
+        // Initialize Live Map
+        function initTrackingMap() {
+            const container = document.getElementById('techTrackingMap');
+            if (!container || typeof L === 'undefined') return;
+
+            if (_trackingMap) {
+                _trackingMap.invalidateSize();
+                return;
+            }
+
+            // Center on Riyadh by default
+            _trackingMap = L.map('techTrackingMap', {
+                center: [24.7136, 46.6753],
+                zoom: 11,
+                zoomControl: true
+            });
+
+            // Standard OpenStreetMap / Google-like layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors | FilterTech ERP'
+            }).addTo(_trackingMap);
+
+            loadTripMarkersOnMap('all');
+        }
+
+        function createCustomPin(status, title) {
+            const colors = {
+                'dispatched': '#f59e0b',
+                'on_trip': '#3b82f6',
+                'returned': '#10b981',
+                'cancelled': '#ef4444'
+            };
+            const color = colors[status] || '#6b7280';
+            const html = `
+                <div style="background:${color};width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #ffffff;box-shadow:0 3px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+                    <span style="transform:rotate(45deg);font-size:15px;color:#fff;">🚗</span>
+                </div>
+            `;
+            return L.divIcon({
+                className: 'custom-trip-pin',
+                html: html,
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+            });
+        }
+
+        function loadTripMarkersOnMap(filterStatus) {
+            if (!_trackingMap) return;
+
+            // Clear existing markers
+            _mapMarkers.forEach(m => _trackingMap.removeLayer(m));
+            _mapMarkers = [];
+
+            const bounds = [];
+
+            _allTripsData.forEach(trip => {
+                if (filterStatus === 'active' && !['dispatched', 'on_trip'].includes(trip.status)) return;
+                if (filterStatus === 'returned' && trip.status !== 'returned') return;
+
+                const lat = parseFloat(trip.latitude);
+                const lng = parseFloat(trip.longitude);
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                bounds.push([lat, lng]);
+
+                const marker = L.marker([lat, lng], {
+                    icon: createCustomPin(trip.status, trip.destination_address)
+                }).addTo(_trackingMap);
+
+                const techName = trip.technician ? trip.technician.name : 'فني غير محدد';
+                const statusLabels = {'dispatched':'تم الإرسال','on_trip':'في الطريق','returned':'عاد','cancelled':'ملغي'};
+                const statusColors = {'dispatched':'#f59e0b','on_trip':'#3b82f6','returned':'#10b981','cancelled':'#ef4444'};
+
+                const popupHtml = `
+                    <div style="font-family:'Cairo',sans-serif;direction:rtl;min-width:210px;text-align:right;">
+                        <div style="font-weight:800;font-size:14px;color:#1e293b;border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                            <span>🧑‍🔧 ${techName}</span>
+                            <span style="background:${statusColors[trip.status]};color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;font-weight:600;">${statusLabels[trip.status] || trip.status}</span>
+                        </div>
+                        <div style="font-size:12px;color:#475569;margin-bottom:3px;"><strong>الوجهة:</strong> ${trip.destination_address}</div>
+                        ${trip.vehicle_description ? `<div style="font-size:12px;color:#475569;margin-bottom:3px;"><strong>السيارة:</strong> ${trip.vehicle_description}</div>` : ''}
+                        ${trip.km_traveled ? `<div style="font-size:12px;color:#1e7e6a;font-weight:700;margin-bottom:3px;"><strong>المسافة:</strong> ${trip.km_traveled} كم</div>` : ''}
+                        ${trip.work_performed ? `<div style="font-size:11px;color:#64748b;margin-top:4px;background:#f8fafc;padding:4px;border-radius:4px;"><strong>الأعمال:</strong> ${trip.work_performed}</div>` : ''}
+                    </div>
+                `;
+
+                marker.bindPopup(popupHtml);
+                marker._tripId = trip.id;
+                _mapMarkers.push(marker);
+            });
+
+            if (bounds.length > 0) {
+                _trackingMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+            }
+        }
+
+        function filterMapMarkers(type) {
+            ['btnMapAll', 'btnMapActive', 'btnMapReturned'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.style.background = '#f8fafc';
+                    el.style.color = '#334155';
+                }
+            });
+
+            if (type === 'all') {
+                document.getElementById('btnMapAll').style.background = '#1e7e6a';
+                document.getElementById('btnMapAll').style.color = '#fff';
+            } else if (type === 'active') {
+                document.getElementById('btnMapActive').style.background = '#1e7e6a';
+                document.getElementById('btnMapActive').style.color = '#fff';
+            } else if (type === 'returned') {
+                document.getElementById('btnMapReturned').style.background = '#1e7e6a';
+                document.getElementById('btnMapReturned').style.color = '#fff';
+            }
+
+            loadTripMarkersOnMap(type);
+        }
+
+        function centerMapOnRiyadh() {
+            if (_trackingMap) {
+                _trackingMap.setView([24.7136, 46.6753], 11);
+            }
+        }
+
+        function focusTripOnMap(tripId, lat, lng) {
+            if (!_trackingMap) return;
+            _trackingMap.setView([lat, lng], 14, { animate: true });
+            const m = _mapMarkers.find(x => x._tripId === tripId);
+            if (m) m.openPopup();
+            // Scroll up to map smoothly
+            document.getElementById('techTrackingMap')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Mini Location Picker Map in Dispatch Modal
+        function initPickerMap() {
+            const container = document.getElementById('modalPickerMap');
+            if (!container || typeof L === 'undefined') return;
+
+            if (_pickerMap) {
+                _pickerMap.invalidateSize();
+                return;
+            }
+
+            _pickerMap = L.map('modalPickerMap', {
+                center: [24.7136, 46.6753],
+                zoom: 11,
+                zoomControl: true
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(_pickerMap);
+
+            // Default marker at center
+            _pickerMarker = L.marker([24.7136, 46.6753], { draggable: true }).addTo(_pickerMap);
+
+            function updateCoords(lat, lng) {
+                document.getElementById('d_lat').value = lat.toFixed(6);
+                document.getElementById('d_lng').value = lng.toFixed(6);
+            }
+
+            updateCoords(24.7136, 46.6753);
+
+            _pickerMarker.on('dragend', function (e) {
+                const pos = e.target.getLatLng();
+                updateCoords(pos.lat, pos.lng);
+            });
+
+            _pickerMap.on('click', function (e) {
+                _pickerMarker.setLatLng(e.latlng);
+                updateCoords(e.latlng.lat, e.latlng.lng);
+            });
+        }
+
+        function setPickerLocation(lat, lng, address) {
+            if (_pickerMarker && _pickerMap) {
+                _pickerMarker.setLatLng([lat, lng]);
+                _pickerMap.setView([lat, lng], 13);
+                document.getElementById('d_lat').value = lat.toFixed(6);
+                document.getElementById('d_lng').value = lng.toFixed(6);
+            }
+            if (address && !document.getElementById('d_dest').value) {
+                document.getElementById('d_dest').value = address;
+            }
+        }
+
+        // Modals Management
+        function openDispatchModal() {
+            const now = new Date();
+            const local = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('d_departure').value = local;
+            document.getElementById('d_tech_id').value = '';
+            document.getElementById('d_ticket_id').value = '';
+            document.getElementById('d_vehicle').value = '';
+            document.getElementById('d_dest').value = '';
+            document.getElementById('d_odo_start').value = '';
+            document.getElementById('d_notes').value = '';
+
+            document.getElementById('dispatchModal').classList.add('active');
+
+            setTimeout(() => {
+                initPickerMap();
+                if (_pickerMap) _pickerMap.invalidateSize();
+            }, 250);
+        }
+
+        function submitDispatch(e) {
+            e.preventDefault();
+            const form = document.getElementById('dispatchForm');
+            const data = new FormData(form);
+
+            fetch(form.action || '/technician/trips/create', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'Accept': 'application/json'
+                },
+                body: data
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    closeModal('dispatchModal');
+                    sessionStorage.setItem('activeDashboardTab', 'tech-trips');
+                    location.reload();
+                } else {
+                    const msg = res.errors ? Object.values(res.errors).flat().join('\n') : (res.message || 'حدث خطأ في الحفظ');
+                    alert('خطأ: ' + msg);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                // Fallback to native form submission
+                form.submit();
+            });
+        }
+
+        function openReturnModal(tripId, odoStart) {
+            _rOdoStart = parseFloat(odoStart) || 0;
+            document.getElementById('r_trip_id').value = tripId;
+            document.getElementById('r_odo_end').value = '';
+            document.getElementById('r_work').value = '';
+            document.getElementById('r_notes').value = '';
+            document.getElementById('r_km_display').textContent = '--';
+            const now = new Date();
+            const local = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('r_return_time').value = local;
+            document.getElementById('returnModal').classList.add('active');
+        }
+
+        function calcKm() {
+            const end = parseFloat(document.getElementById('r_odo_end').value) || 0;
+            const km = end - _rOdoStart;
+            document.getElementById('r_km_display').textContent = km > 0 ? km.toFixed(1) + ' كم' : '--';
+        }
+
+        function submitReturn(e) {
+            e.preventDefault();
+            const tripId = document.getElementById('r_trip_id').value;
+            const data = new FormData(document.getElementById('returnForm'));
+
+            fetch(`/technician/trips/${tripId}/return`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'Accept': 'application/json'
+                },
+                body: data
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    closeModal('returnModal');
+                    sessionStorage.setItem('activeDashboardTab', 'tech-trips');
+                    location.reload();
+                } else {
+                    alert('خطأ: ' + JSON.stringify(res.errors || res.message));
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('returnForm').action = `/technician/trips/${tripId}/return`;
+                document.getElementById('returnForm').submit();
+            });
+        }
+
+        function openEditTripModal(tripId) {
+            fetch('/technician/trips', {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(res => {
+                const trip = res.trips ? res.trips.find(t => t.id === tripId) : null;
+                if (!trip) return;
+                document.getElementById('et_trip_id').value = trip.id;
+                document.getElementById('et_tech').value = trip.technician_id;
+                document.getElementById('et_status').value = trip.status;
+                document.getElementById('et_dest').value = trip.destination_address;
+                document.getElementById('et_vehicle').value = trip.vehicle_description || '';
+                document.getElementById('et_odo_start').value = trip.odometer_start || '';
+                document.getElementById('et_odo_end').value = trip.odometer_end || '';
+                document.getElementById('et_work').value = trip.work_performed || '';
+                document.getElementById('et_notes').value = trip.notes || '';
+                if (trip.departure_time) document.getElementById('et_departure').value = trip.departure_time.replace(' ', 'T').slice(0, 16);
+                if (trip.return_time) document.getElementById('et_return').value = trip.return_time.replace(' ', 'T').slice(0, 16);
+                document.getElementById('editTripModal').classList.add('active');
+            });
+        }
+
+        function submitEditTrip(e) {
+            e.preventDefault();
+            const tripId = document.getElementById('et_trip_id').value;
+            const data = new FormData(document.getElementById('editTripForm'));
+
+            fetch(`/technician/trips/${tripId}/update`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'Accept': 'application/json'
+                },
+                body: data
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    closeModal('editTripModal');
+                    sessionStorage.setItem('activeDashboardTab', 'tech-trips');
+                    location.reload();
+                } else {
+                    alert('خطأ: ' + JSON.stringify(res.errors || res.message));
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('editTripForm').action = `/technician/trips/${tripId}/update`;
+                document.getElementById('editTripForm').submit();
+            });
+        }
+
+        function deleteTrip(tripId) {
+            if (!confirm('هل أنت متأكد من حذف هذه الرحلة نهائياً؟')) return;
+            fetch(`/technician/trips/${tripId}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'Accept': 'application/json'
+                }
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    sessionStorage.setItem('activeDashboardTab', 'tech-trips');
+                    location.reload();
+                } else {
+                    alert('خطأ في الحذف');
+                }
+            });
+        }
+
+        function filterTripsTable() {
+            const techFilter = document.getElementById('tripFilterTech').value;
+            const statusFilter = document.getElementById('tripFilterStatus').value;
+            const destFilter = (document.getElementById('tripFilterDest').value || '').toLowerCase().trim();
+            document.querySelectorAll('#techTripsTable tbody tr').forEach(row => {
+                const techMatch = !techFilter || row.dataset.techId === techFilter;
+                const statusMatch = !statusFilter || row.dataset.status === statusFilter;
+                const destMatch = !destFilter || (row.dataset.dest || '').includes(destFilter);
+                row.style.display = techMatch && statusMatch && destMatch ? '' : 'none';
+            });
+        }
+
+        function resetTripsFilter() {
+            document.getElementById('tripFilterTech').value = '';
+            document.getElementById('tripFilterStatus').value = '';
+            document.getElementById('tripFilterDest').value = '';
+            filterTripsTable();
+        }
+
+        // Auto-initialize map when tab is active or clicked
+        document.addEventListener('DOMContentLoaded', function () {
+            // Check if active tab is tech-trips
+            const activeTab = sessionStorage.getItem('activeDashboardTab');
+            if (activeTab === 'tech-trips') {
+                const btn = document.querySelector('button[onclick*="tech-trips"]');
+                if (btn) switchNavTab('tech-trips', btn);
+            }
+
+            // Hook into tab changes to invalidate map size
+            const oldSwitchNavTab = window.switchNavTab;
+            window.switchNavTab = function (tabName, el) {
+                if (typeof oldSwitchNavTab === 'function') {
+                    oldSwitchNavTab(tabName, el);
+                }
+                if (tabName === 'tech-trips') {
+                    setTimeout(initTrackingMap, 200);
+                }
+            };
+
+            // If tech-trips pane is visible right now, initialize map
+            const techPane = document.getElementById('tab-tech-trips');
+            if (techPane && (techPane.classList.contains('active') || window.getComputedStyle(techPane).display !== 'none')) {
+                setTimeout(initTrackingMap, 300);
+            }
+        });
+
+
+        // =============================================
+        // الموارد البشرية - Human Resources (HR) Module JS
+        // =============================================
+        const hrSectionTitles = {
+            'overview': '📈 لوحة مؤشرات الموارد البشرية',
+            'employees': '👥 إدارة سجلات وبيانات الموظفين',
+            'attendance': '🕒 سجلات الحضور والانصراف والبصمة',
+            'payroll': '💵 مسيرات الرواتب والتحويلات المالية',
+            'requests': '✉️ طلبات الموظفين (إجازات وسلف واستئذان)',
+            'entitlements': '📄 المستحقات والخصومات والمكافآت',
+            'custodies': '📦 إدارة العهد والأصول المسلمة للموظفين',
+            'tasks': '📋 متابعة وتكليف المهام الإدارية والميدانية',
+            'reports': '📊 تقارير وإحصائيات الموارد البشرية'
+        };
+
+        function switchHrSubView(viewId) {
+            const hub = document.getElementById('hrPortalHub');
+            const container = document.getElementById('hrSubViewsContainer');
+            if (hub) hub.style.display = 'none';
+            if (container) container.style.display = 'block';
+
+            document.querySelectorAll('.hr-sub-pane').forEach(p => p.style.display = 'none');
+            const targetPane = document.getElementById('hr-sub-' + viewId);
+            if (targetPane) targetPane.style.display = 'block';
+
+            const titleEl = document.getElementById('hrCurrentSectionTitle');
+            if (titleEl && hrSectionTitles[viewId]) {
+                titleEl.innerText = hrSectionTitles[viewId];
+            }
+
+            document.querySelectorAll('.hr-sub-nav-btn').forEach(btn => {
+                if (btn.dataset.view === viewId) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            try { sessionStorage.setItem('erp_hr_active_subview', viewId); } catch(e){}
+        }
+
+        function returnToHrPortal() {
+            const hub = document.getElementById('hrPortalHub');
+            const container = document.getElementById('hrSubViewsContainer');
+            if (hub) hub.style.display = 'block';
+            if (container) container.style.display = 'none';
+            document.querySelectorAll('.hr-sub-pane').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.hr-sub-nav-btn').forEach(b => b.classList.remove('active'));
+            try { sessionStorage.removeItem('erp_hr_active_subview'); } catch(e){}
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            @if(session('erp_hr_active_subview'))
+                switchHrSubView('{{ session('erp_hr_active_subview') }}');
+            @else
+                try {
+                    const savedHrView = sessionStorage.getItem('erp_hr_active_subview');
+                    if (savedHrView) switchHrSubView(savedHrView);
+                } catch(e){}
+            @endif
+
+            // Close modal when clicking dark backdrop
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeModal(modal.id);
+                    }
+                });
+            });
+        });
+
+        function filterHrEmployeesTable() {
+            const q = (document.getElementById('hrEmpSearchInput')?.value || '').toLowerCase().trim();
+            document.querySelectorAll('#hrEmployeesTable tbody tr').forEach(row => {
+                const text = row.dataset.empText || '';
+                row.style.display = !q || text.includes(q) ? '' : 'none';
+            });
+        }
+
+        function executeSystemUpdate(btn) {
+            if (confirm("⚠️ تأكيد تحديث السيرفر:\n\nسيتم سحب أحدث كود وتعديلات من مستودع GitHub، وتشغيل المايجريشن لتحديث قاعدة البيانات، وتحديث كاش القوالب والتوجيه على السيرفر.\n\nهل ترغب في بدء التحديث الآن؟")) {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span>⏳</span><span>جاري تحديث السيرفر وسحب الكود...</span>';
+                }
+                document.getElementById('systemUpdateForm').submit();
+            }
+        }
+
+</script>
 </body>
 </html>

@@ -32,9 +32,11 @@ class ProcurementService
         array $items,
         string $orderDate,
         ?string $notes = null,
-        ?User $user = null
+        ?User $user = null,
+        ?float $taxAmount = 0.0,
+        ?string $vendorInvoiceNumber = null
     ): PurchaseOrder {
-        return DB::transaction(function () use ($supplier, $warehouse, $items, $orderDate, $notes, $user) {
+        return DB::transaction(function () use ($supplier, $warehouse, $items, $orderDate, $notes, $user, $taxAmount, $vendorInvoiceNumber) {
             $totalAmount = 0.0000;
 
             $po = PurchaseOrder::create([
@@ -43,6 +45,8 @@ class ProcurementService
                 'warehouse_id' => $warehouse->id,
                 'status' => 'draft',
                 'total_amount' => 0,
+                'tax_amount' => $taxAmount ?? 0,
+                'vendor_invoice_number' => $vendorInvoiceNumber,
                 'order_date' => $orderDate,
                 'notes' => $notes,
                 'created_by' => $user?->id ?? auth()->id() ?? 1,
@@ -51,6 +55,7 @@ class ProcurementService
             foreach ($items as $item) {
                 $qty = (int) $item['quantity'];
                 $price = (float) $item['unit_price'];
+                $taxPercent = isset($item['tax_percent']) ? (float)$item['tax_percent'] : 0.0;
                 $lineTotal = round($qty * $price, 4);
                 $totalAmount += $lineTotal;
 
@@ -60,11 +65,15 @@ class ProcurementService
                     'ordered_qty' => $qty,
                     'received_qty' => 0,
                     'unit_price' => $price,
+                    'tax_percent' => $taxPercent,
                     'total_price' => $lineTotal,
                 ]);
             }
 
             $po->total_amount = $totalAmount;
+            if ($taxAmount !== null) {
+                $po->tax_amount = $taxAmount;
+            }
             $po->save();
 
             AuditLog::record(

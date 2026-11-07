@@ -16,6 +16,7 @@ class PurchaseOrderItem extends Model
         'ordered_qty',
         'received_qty',
         'unit_price',
+        'tax_percent',
         'total_price',
     ];
 
@@ -25,6 +26,7 @@ class PurchaseOrderItem extends Model
             'ordered_qty' => 'integer',
             'received_qty' => 'integer',
             'unit_price' => 'decimal:4',
+            'tax_percent' => 'decimal:2',
             'total_price' => 'decimal:4',
         ];
     }
