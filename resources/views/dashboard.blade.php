@@ -5702,22 +5702,6 @@
                     </div>
                 </div>
 
-                <!-- Barcode Scanner Input -->
-                <div style="margin-bottom: 0.75rem; background: rgba(15,23,42,0.5); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 0.75rem 1rem;">
-                    <label style="font-size: 12px; color: #38bdf8; font-weight: 700; display:block; margin-bottom: 4px;">📷 مسح الباركود / إدخال الكود يدوياً:</label>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <input type="text" id="posBarcodeInput" class="form-control num" autocomplete="off"
-                            placeholder="امسح الباركود أو أدخل SKU ثم اضغط Enter..."
-                            onkeydown="if(event.key==='Enter'){event.preventDefault();posSearchByBarcode();}"
-                            style="flex:1; font-size:14px; letter-spacing:1px;">
-                        <button type="button" onclick="posSearchByBarcode()"
-                            style="background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff; border:none;
-                                   border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px; font-weight:700; white-space:nowrap;">
-                            🔍 بحث
-                        </button>
-                    </div>
-                    <div id="posBarcodeMsg" style="font-size:11.5px; margin-top:4px; color:#94a3b8;"></div>
-                </div>
 
                 <!-- Dynamic Items Selector -->
                 <div style="margin-top: 1rem; margin-bottom: 1rem;">
