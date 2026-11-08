@@ -13,6 +13,7 @@ use App\Models\DeviceModel;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\MaintenanceTicket;
+use App\Models\NotificationLog;
 use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\Product;
@@ -500,6 +501,8 @@ class DashboardController extends Controller
             'payment_method' => 'required|in:cash,mada_pos,bank_transfer,credit_card,credit',
             'paid_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
+            'reminder_date'  => 'nullable|date',
+            'reminder_notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -555,6 +558,136 @@ class DashboardController extends Controller
                 initialPayment: $initialPayment,
                 user: Auth::user()
             );
+
+            // حفظ موعد تذكير العميل وإرساله تلقائياً لخدمة العملاء
+            $reminderDate = $validated['reminder_date'] ?? null;
+            $reminderNotes = $validated['reminder_notes'] ?? null;
+
+            // إذا لم يتم إدخال تاريخ يدوي، نبحث عن أطول عداد للأصناف المباعة
+            if (!$reminderDate) {
+                $maxMonths = 0;
+                foreach ($validated['items'] as $it) {
+                    $p = Product::find($it['product_id']);
+                    if ($p && (int)($p->filter_life_months ?? 0) > $maxMonths) {
+                        $maxMonths = (int)$p->filter_life_months;
+                        if (!$reminderNotes && $p->filter_life_note) {
+                            $reminderNotes = $p->filter_life_note;
+                        }
+                    }
+                }
+                if ($maxMonths > 0) {
+                    $reminderDate = Carbon::parse($invoice->invoice_date)->addMonthsNoOverflow($maxMonths)->toDateString();
+                }
+            }
+
+            if ($reminderDate) {
+                $invoice->reminder_date  = $reminderDate;
+                $invoice->reminder_notes = $reminderNotes;
+                $invoice->save();
+
+                // 1. تحديد أو إنشاء جهاز عميل (CustomerDevice)
+                $device = CustomerDevice::where('customer_id', $customer->id)
+                    ->where('status', 'active')
+                    ->latest()
+                    ->first();
+
+                if (!$device) {
+                    $defaultModel = DeviceModel::first();
+                    $device = CustomerDevice::create([
+                        'device_code'          => 'DEV-' . str_pad($customer->id, 4, '0', STR_PAD_LEFT) . '-' . strtoupper(Str::random(4)),
+                        'customer_id'          => $customer->id,
+                        'customer_address_id'  => $address?->id,
+                        'device_model_id'      => $defaultModel?->id ?? 1,
+                        'invoice_id'           => $invoice->id,
+                        'installation_date'    => $invoice->invoice_date,
+                        'status'               => 'active',
+                        'notes'                => 'محطة وفلاتر مشتراة بموجب الفاتورة رقم: ' . $invoice->invoice_number,
+                    ]);
+                }
+
+                // 2. إنشاء مراحل الاستحقاق (CustomerDeviceStage) لكل صنف بجدول استحقاقات الفلاتر
+                $soldProducts = Product::whereIn('id', array_column($validated['items'], 'product_id'))->get();
+                $prodNames = [];
+
+                foreach ($soldProducts as $soldProd) {
+                    $prodNames[] = $soldProd->name_ar;
+                    $lifeMonths = (int) ($soldProd->filter_life_months ?: 0);
+                    $itemDueDate = $lifeMonths > 0 
+                        ? Carbon::parse($invoice->invoice_date)->addMonthsNoOverflow($lifeMonths)->toDateString()
+                        : $reminderDate;
+
+                    if ($device) {
+                        $maxStage = (int) CustomerDeviceStage::where('customer_device_id', $device->id)->max('stage_number');
+                        $stageNum = $maxStage + 1;
+                        $intervalDays = ($lifeMonths > 0 ? $lifeMonths * 30 : 180);
+
+                        CustomerDeviceStage::create([
+                            'customer_device_id'         => $device->id,
+                            'stage_number'               => $stageNum,
+                            'stage_name_ar'              => $soldProd->name_ar,
+                            'product_id'                 => $soldProd->id,
+                            'service_interval_days'      => $intervalDays,
+                            'service_interval_months'    => $lifeMonths ?: 6,
+                            'last_actual_replacement_at' => $invoice->invoice_date,
+                            'next_due_at'                => $itemDueDate,
+                            'status'                     => 'upcoming',
+                            'technician_notes'           => 'مبيعات مباشرة - فاتورة #' . $invoice->invoice_number . ($soldProd->filter_life_note ? ' (' . $soldProd->filter_life_note . ')' : ''),
+                        ]);
+
+                        // تفاصيل تذكير الصنف
+                        if (\Illuminate\Support\Facades\Schema::hasTable('invoice_item_reminders')) {
+                            $invItem = $invoice->items()->where('product_id', $soldProd->id)->first();
+                            if ($invItem) {
+                                DB::table('invoice_item_reminders')->insert([
+                                    'invoice_id'      => $invoice->id,
+                                    'invoice_item_id' => $invItem->id,
+                                    'product_id'      => $soldProd->id,
+                                    'component_name'  => $soldProd->name_ar,
+                                    'reminder_date'   => $itemDueDate,
+                                    'life_months'     => $lifeMonths,
+                                    'life_liters'     => (int) ($soldProd->filter_life_liters ?? 0),
+                                    'reminder_type'   => $soldProd->reminder_type ?? 'months',
+                                    'created_at'      => now(),
+                                    'updated_at'      => now(),
+                                ]);
+                            }
+                        }
+                    }
+                }
+
+                $prodNamesText = !empty($prodNames) ? implode(' + ', $prodNames) : 'فلتر مياه';
+
+                // 3. إرسال مهمة تذكير لخدمة العملاء (CustomerInteraction)
+                CustomerInteraction::create([
+                    'customer_id'        => $customer->id,
+                    'customer_device_id' => $device?->id,
+                    'agent_id'           => Auth::id() ?? 1,
+                    'channel'            => 'system_generated',
+                    'outcome'            => 'agreed_scheduled',
+                    'follow_up_date'     => $reminderDate,
+                    'notes'              => '🔔 تذكير استحقاق صيانة لخدمة العملاء: موعد صيانة وتغيير فلتر (' . $prodNamesText . ') للعميل (' . $customer->name . ' - ' . $customer->primary_phone . ') بموجب الفاتورة رقم (' . $invoice->invoice_number . '). موعد الاتصال بالعميل: ' . $reminderDate . ($reminderNotes ? ' - ' . $reminderNotes : ''),
+                ]);
+
+                // 4. إرسال إشعار للنظام لجميع موظفي خدمة العملاء
+                $ccUsers = User::whereHas('roles', fn($q) => $q->whereIn('name', ['call_center', 'super_admin']))->get();
+                foreach ($ccUsers as $ccUser) {
+                    NotificationLog::create([
+                        'user_id'         => $ccUser->id,
+                        'type'            => 'due_reminder',
+                        'idempotency_key' => hash('sha256', 'sale_reminder_' . $invoice->id . '_' . $ccUser->id . '_' . time()),
+                        'channel'         => 'database',
+                        'title'           => '🔔 تذكير صيانة جديد لخدمة العملاء',
+                        'body'            => 'تم جدولة تذكير تغيير فلاتر للعميل (' . $customer->name . ') لصنف (' . $prodNamesText . ') بتاريخ: ' . $reminderDate,
+                        'data'            => [
+                            'invoice_id'    => $invoice->id,
+                            'customer_id'   => $customer->id,
+                            'reminder_date' => $reminderDate,
+                        ],
+                        'status'          => 'sent',
+                        'sent_at'         => now(),
+                    ]);
+                }
+            }
 
             return redirect()->back()->with('success', "تم إصدار الفاتورة الضريبية رقم ({$invoice->invoice_number}) بنجاح بقيمة " . number_format($invoice->grand_total, 2) . " ر.س")
                                      ->with('print_invoice_id', $invoice->id);
@@ -2300,30 +2433,37 @@ class DashboardController extends Controller
         }
 
         $validated = $request->validate([
-            'name_ar'       => 'required|string|max:191',
-            'name_en'       => 'nullable|string|max:191',
-            'sku'           => 'nullable|string|max:64|unique:products,sku',
-            'barcode'       => 'nullable|string|max:64|unique:products,barcode',
-            'category_id'   => 'nullable|exists:categories,id',
-            'type'          => 'required|in:water_device,filter_cartridge,membrane,pump,spare_part,service',
-            'is_compound'   => 'nullable|boolean',
-            'unit'          => 'nullable|string|max:32',
-            'cost_price'    => 'nullable|numeric|min:0',
-            'selling_price' => 'nullable|numeric|min:0',
-            'reorder_level' => 'nullable|integer|min:0',
-            'description'   => 'nullable|string',
-            'is_active'     => 'nullable|boolean',
+            'name_ar'             => 'required|string|max:191',
+            'name_en'             => 'nullable|string|max:191',
+            'sku'                 => 'nullable|string|max:64|unique:products,sku',
+            'barcode'             => 'nullable|string|max:64|unique:products,barcode',
+            'category_id'         => 'nullable|exists:categories,id',
+            'type'                => 'required|in:water_device,filter_cartridge,membrane,pump,spare_part,service',
+            'is_compound'         => 'nullable|boolean',
+            'unit'                => 'nullable|string|max:32',
+            'cost_price'          => 'nullable|numeric|min:0',
+            'selling_price'       => 'nullable|numeric|min:0',
+            'reorder_level'       => 'nullable|integer|min:0',
+            'description'         => 'nullable|string',
+            'is_active'           => 'nullable|boolean',
+            'filter_life_months'  => 'nullable|integer|min:0|max:120',
+            'filter_life_liters'  => 'nullable|integer|min:0',
+            'reminder_type'       => 'nullable|in:months,liters,both',
+            'filter_life_note'    => 'nullable|string|max:255',
         ]);
 
         if (empty($validated['sku'])) {
             $validated['sku'] = 'SKU-' . strtoupper(Str::random(8));
         }
 
-        $validated['is_compound'] = $request->has('is_compound') ? (bool)$request->input('is_compound') : false;
-        $validated['is_active']   = $request->has('is_active') ? (bool)$request->input('is_active') : true;
-        $validated['unit']        = $validated['unit'] ?? 'piece';
-        $validated['cost_price']  = $validated['cost_price'] ?? 0.00;
-        $validated['selling_price'] = $validated['selling_price'] ?? 0.00;
+        $validated['is_compound']         = $request->has('is_compound') ? (bool)$request->input('is_compound') : false;
+        $validated['is_active']           = $request->has('is_active') ? (bool)$request->input('is_active') : true;
+        $validated['unit']                = $validated['unit'] ?? 'piece';
+        $validated['cost_price']          = $validated['cost_price'] ?? 0.00;
+        $validated['selling_price']       = $validated['selling_price'] ?? 0.00;
+        $validated['filter_life_months']  = (int)($validated['filter_life_months'] ?? 0);
+        $validated['filter_life_liters']  = (int)($validated['filter_life_liters'] ?? 0);
+        $validated['reminder_type']       = $validated['reminder_type'] ?? 'months';
 
         $product = Product::create($validated);
 
@@ -2348,20 +2488,28 @@ class DashboardController extends Controller
         }
 
         $validated = $request->validate([
-            'name_ar'       => 'required|string|max:191',
-            'name_en'       => 'nullable|string|max:191',
-            'sku'           => 'required|string|max:64|unique:products,sku,' . $product->id,
-            'barcode'       => 'nullable|string|max:64|unique:products,barcode,' . $product->id,
-            'category_id'   => 'nullable|exists:categories,id',
-            'type'          => 'required|in:water_device,filter_cartridge,membrane,pump,spare_part,service',
-            'is_compound'   => 'nullable|boolean',
-            'unit'          => 'nullable|string|max:32',
-            'cost_price'    => 'nullable|numeric|min:0',
-            'selling_price' => 'nullable|numeric|min:0',
-            'created_at'    => 'nullable|date',
+            'name_ar'             => 'required|string|max:191',
+            'name_en'             => 'nullable|string|max:191',
+            'sku'                 => 'required|string|max:64|unique:products,sku,' . $product->id,
+            'barcode'             => 'nullable|string|max:64|unique:products,barcode,' . $product->id,
+            'category_id'         => 'nullable|exists:categories,id',
+            'type'                => 'required|in:water_device,filter_cartridge,membrane,pump,spare_part,service',
+            'is_compound'         => 'nullable|boolean',
+            'unit'                => 'nullable|string|max:32',
+            'cost_price'          => 'nullable|numeric|min:0',
+            'selling_price'       => 'nullable|numeric|min:0',
+            'created_at'          => 'nullable|date',
+            'filter_life_months'  => 'nullable|integer|min:0|max:120',
+            'filter_life_liters'  => 'nullable|integer|min:0',
+            'reminder_type'       => 'nullable|in:months,liters,both',
+            'filter_life_note'    => 'nullable|string|max:255',
         ]);
 
-        $validated['is_compound'] = $request->has('is_compound') ? (bool)$request->input('is_compound') : false;
+        $validated['is_compound']        = $request->has('is_compound') ? (bool)$request->input('is_compound') : false;
+        $validated['filter_life_months'] = (int)($request->input('filter_life_months', 0));
+        $validated['filter_life_liters'] = (int)($request->input('filter_life_liters', 0));
+        $validated['reminder_type']      = $request->input('reminder_type', 'months');
+        $validated['filter_life_note']   = $request->input('filter_life_note');
         if (!empty($validated['created_at'])) {
             $product->created_at = $validated['created_at'];
         }

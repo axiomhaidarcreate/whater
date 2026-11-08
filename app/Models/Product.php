@@ -25,16 +25,22 @@ class Product extends Model
         'reorder_level',
         'is_active',
         'description',
+        'filter_life_months',
+        'filter_life_liters',
+        'reminder_type',
+        'filter_life_note',
     ];
 
     protected function casts(): array
     {
         return [
-            'cost_price' => 'decimal:4',
-            'selling_price' => 'decimal:4',
-            'reorder_level' => 'integer',
-            'is_active' => 'boolean',
-            'is_compound' => 'boolean',
+            'cost_price'         => 'decimal:4',
+            'selling_price'      => 'decimal:4',
+            'reorder_level'      => 'integer',
+            'is_active'          => 'boolean',
+            'is_compound'        => 'boolean',
+            'filter_life_months' => 'integer',
+            'filter_life_liters' => 'integer',
         ];
     }
 

@@ -4457,6 +4457,13 @@
                                     <td class="num" style="color: #38bdf8; font-weight: 800;">{{ $ap->sku }}</td>
                                     <td>
                                         <div style="font-weight: 700; color: #1e293b;">{{ $ap->name_ar }}</div>
+                                        @if(($ap->filter_life_months ?? 0) > 0)
+                                        <div style="margin-top: 2px;">
+                                            <span style="display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; font-weight: 700;">
+                                                ⏱️ دورة التغيير: كل {{ $ap->filter_life_months }} أشهر
+                                            </span>
+                                        </div>
+                                        @endif
                                         @if($ap->name_en)
                                         <div style="font-size: 0.75rem; color: var(--text-dim);">{{ $ap->name_en }}</div>
                                         @endif
@@ -4520,7 +4527,11 @@
                                                     'cost_price' => (float)$ap->cost_price,
                                                     'selling_price' => (float)$ap->selling_price,
                                                     'unit' => $ap->unit ?? 'قطعة',
-                                                    'created_at' => $ap->created_at?->format('Y-m-d')
+                                                    'created_at' => $ap->created_at?->format('Y-m-d'),
+                                                    'filter_life_months' => (int)($ap->filter_life_months ?? 0),
+                                                    'filter_life_liters' => (int)($ap->filter_life_liters ?? 0),
+                                                    'reminder_type' => $ap->reminder_type ?? 'months',
+                                                    'filter_life_note' => $ap->filter_life_note ?? '',
                                                 ]) }})" title="تعديل بيانات الصنف">
                                                 ✏️ تعديل
                                             </button>
@@ -5722,10 +5733,15 @@
                             <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label>الصنف:</label>
-                                    <select name="items[0][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(0, this)" required>
+                                    <select name="items[0][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(0, this); calcPosReminderDate();" required>
                                         <option value="">اختر الصنف...</option>
                                         @foreach($products as $p)
-                                        <option value="{{ $p->id }}" data-price="{{ (float)$p->selling_price }}">
+                                        <option value="{{ $p->id }}"
+                                            data-price="{{ (float)$p->selling_price }}"
+                                            data-life-months="{{ (int)($p->filter_life_months ?? 0) }}"
+                                            data-life-liters="{{ (int)($p->filter_life_liters ?? 0) }}"
+                                            data-reminder-type="{{ $p->reminder_type ?? 'months' }}"
+                                            data-life-note="{{ $p->filter_life_note ?? '' }}">
                                             {{ $p->name_ar }} ({{ $p->sku }}) — {{ number_format($p->selling_price, 2) }} ر.س
                                         </option>
                                         @endforeach
@@ -5770,6 +5786,27 @@
                     <div class="form-group">
                         <label>ملاحظات إضافية:</label>
                         <input type="text" name="notes" class="form-control" placeholder="اختياري...">
+                    </div>
+                </div>
+
+                {{-- ===== موعد التذكير التلقائي ===== --}}
+                <div id="posReminderSection" style="background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.3); border-radius: 10px; padding: 0.9rem 1.2rem; margin-bottom: 1.25rem;">
+                    <div style="font-weight: 700; color: #10b981; margin-bottom: 0.6rem; font-size: 0.9rem; display:flex; align-items:center; gap:7px;">
+                        🔔 موعد تذكير العميل بالصيانة / تغيير الفلاتر
+                        <span style="font-size:11px; color:#64748b; font-weight:400;">(يُحسب تلقائياً بناءً على عداد الصنف)</span>
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>تاريخ التذكير:</label>
+                            <input type="date" name="reminder_date" id="posReminderDate" class="form-control">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>ملاحظة التذكير:</label>
+                            <input type="text" name="reminder_notes" id="posReminderNotes" class="form-control" placeholder="مثال: تغيير فلاتر 7 مراحل">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; justify-content:flex-end;">
+                            <div id="posReminderAutoLabel" style="font-size:11.5px; color:#059669; background:rgba(16,185,129,0.1); border-radius:6px; padding:6px 10px; display:none; text-align:center; font-weight:600;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -6029,6 +6066,35 @@
                     </div>
                 </div>
 
+                {{-- ===== قسم عداد صلاحية الفلتر ===== --}}
+                <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.5rem;">
+                    <div style="font-weight: 700; color: #10b981; margin-bottom: 0.75rem; font-size: 0.95rem;">
+                        ⏱️ عداد صلاحية الفلتر (للتذكير التلقائي عند البيع)
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>نوع العداد:</label>
+                            <select name="reminder_type" class="form-control" onchange="toggleNewProductLifeFields(this.value)">
+                                <option value="months">بالأشهر فقط</option>
+                                <option value="liters">بالليترات فقط</option>
+                                <option value="both">أشهر + ليترات</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="newProd_months_wrap">
+                            <label>مدة الصلاحية (شهر):</label>
+                            <input type="number" name="filter_life_months" class="form-control num" value="6" min="0" max="120" placeholder="مثال: 6">
+                        </div>
+                        <div class="form-group" id="newProd_liters_wrap" style="display:none;">
+                            <label>سعة الليترات (لتر):</label>
+                            <input type="number" name="filter_life_liters" class="form-control num" value="0" min="0" placeholder="مثال: 3785">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.25rem;">
+                        <label>ملاحظة العداد (اختياري):</label>
+                        <input type="text" name="filter_life_note" class="form-control" placeholder="مثال: يُغيَّر كل 6 أشهر أو 1000 غالون أيهما أسبق">
+                    </div>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
                     <button type="button" class="btn btn-outline" onclick="closeModal('newProductModal')">إلغاء</button>
                     <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669);">حفظ وإضافة الصنف</button>
@@ -6124,6 +6190,35 @@
                     <div class="form-group">
                         <label>سعر البيع الافتراضي (ر.س):</label>
                         <input type="number" step="0.01" name="selling_price" id="editProdSellingPrice" class="form-control num" min="0">
+                    </div>
+                </div>
+
+                {{-- ===== قسم عداد صلاحية الفلتر (تعديل) ===== --}}
+                <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.5rem;">
+                    <div style="font-weight: 700; color: #10b981; margin-bottom: 0.75rem; font-size: 0.95rem;">
+                        ⏱️ عداد صلاحية الفلتر
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>نوع العداد:</label>
+                            <select name="reminder_type" id="editProdReminderType" class="form-control" onchange="toggleEditProductLifeFields(this.value)">
+                                <option value="months">بالأشهر فقط</option>
+                                <option value="liters">بالليترات فقط</option>
+                                <option value="both">أشهر + ليترات</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="editProd_months_wrap">
+                            <label>مدة الصلاحية (شهر):</label>
+                            <input type="number" name="filter_life_months" id="editProdLifeMonths" class="form-control num" value="0" min="0" max="120">
+                        </div>
+                        <div class="form-group" id="editProd_liters_wrap" style="display:none;">
+                            <label>سعة الليترات (لتر):</label>
+                            <input type="number" name="filter_life_liters" id="editProdLifeLiters" class="form-control num" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.25rem;">
+                        <label>ملاحظة العداد (اختياري):</label>
+                        <input type="text" name="filter_life_note" id="editProdLifeNote" class="form-control" placeholder="مثال: يُغيَّر كل 6 أشهر">
                     </div>
                 </div>
 
@@ -7494,7 +7589,10 @@
         // Modal Controls
         function openNewSaleModal() { document.getElementById('newSaleModal').classList.add('active'); }
         function openNewSupplierModal() { document.getElementById('newSupplierModal').classList.add('active'); }
-        function openNewProductModal() { document.getElementById('newProductModal').classList.add('active'); }
+        function openNewProductModal() {
+            document.getElementById('newProductModal').classList.add('active');
+            updateNewProdLifePreview();
+        }
 
         function openEditProductModal(p) {
             document.getElementById('editProductForm').action = '/products/' + p.id + '/update';
@@ -7509,6 +7607,20 @@
             document.getElementById('editProdUnit').value = p.unit || 'قطعة';
             document.getElementById('editProdCostPrice').value = p.cost_price || 0;
             document.getElementById('editProdSellingPrice').value = p.selling_price || 0;
+            // عداد الصلاحية
+            const rType = p.reminder_type || 'months';
+            document.getElementById('editProdReminderType').value = rType;
+            document.getElementById('editProdLifeMonths').value  = p.filter_life_months || 0;
+            document.getElementById('editProdLifeLiters').value  = p.filter_life_liters || 0;
+            document.getElementById('editProdLifeNote').value    = p.filter_life_note || '';
+            toggleEditProductLifeFields(rType);
+            updateEditProdLifePreview();
+            document.querySelectorAll('#editProductModal .btn-preset-chip-edit').forEach(b => {
+                b.style.background = '#fff';
+                b.style.color = '#334155';
+                b.style.borderColor = '#cbd5e1';
+                b.classList.remove('active');
+            });
             document.getElementById('editProductModal').classList.add('active');
         }
         function openNewPurchaseOrderModal() {
@@ -7949,6 +8061,173 @@
             }
         }
 
+        // ============================================================
+        // عداد صلاحية الفلتر — أزرار الاختيار السريع والمعاينة (إضافة صنف)
+        // ============================================================
+        function setNewProdPresetLife(months, btn) {
+            const input = document.getElementById('newProdLifeMonths');
+            if (input) input.value = months;
+            document.querySelectorAll('#newProductModal .btn-preset-chip').forEach(b => {
+                b.style.background = '#fff';
+                b.style.color = '#334155';
+                b.style.borderColor = '#cbd5e1';
+                b.classList.remove('active');
+            });
+            if (btn) {
+                btn.style.background = '#10b981';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#10b981';
+                btn.classList.add('active');
+            }
+            updateNewProdLifePreview();
+        }
+
+        function updateNewProdLifePreview() {
+            const input = document.getElementById('newProdLifeMonths');
+            const months = input ? parseInt(input.value) || 0 : 0;
+            const textBox = document.getElementById('newProdLifePreviewText');
+            const dateBox = document.getElementById('newProdLifePreviewTargetDate');
+            if (!textBox || !dateBox) return;
+
+            if (months > 0) {
+                const d = new Date();
+                d.setMonth(d.getMonth() + months);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const targetDate = `${yyyy}-${mm}-${dd}`;
+                textBox.innerHTML = `عند بيع هذا الصنف، سيتم جدولة تذكير آلي لخدمة العملاء بعد <b>${months} شهر</b> للتواصل مع العميل.`;
+                dateBox.textContent = `موعد اتصال خدمة العملاء: ${targetDate}`;
+                dateBox.style.display = 'inline-block';
+            } else {
+                textBox.innerHTML = `هذا الصنف بدون عداد (لن يتم توليد تذكير آلي لخدمة العملاء عند بيعه).`;
+                dateBox.style.display = 'none';
+            }
+        }
+
+        function toggleNewProductLifeFields(type) {
+            const mWrap = document.getElementById('newProd_months_wrap');
+            const lWrap = document.getElementById('newProd_liters_wrap');
+            if (!mWrap || !lWrap) return;
+            mWrap.style.display = (type === 'months' || type === 'both') ? 'block' : 'none';
+            lWrap.style.display = (type === 'liters' || type === 'both') ? 'block' : 'none';
+        }
+
+        // ============================================================
+        // عداد صلاحية الفلتر — أزرار الاختيار السريع والمعاينة (تعديل صنف)
+        // ============================================================
+        function setEditProdPresetLife(months, btn) {
+            const input = document.getElementById('editProdLifeMonths');
+            if (input) input.value = months;
+            document.querySelectorAll('#editProductModal .btn-preset-chip-edit').forEach(b => {
+                b.style.background = '#fff';
+                b.style.color = '#334155';
+                b.style.borderColor = '#cbd5e1';
+                b.classList.remove('active');
+            });
+            if (btn) {
+                btn.style.background = '#0284c7';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#0284c7';
+                btn.classList.add('active');
+            }
+            updateEditProdLifePreview();
+        }
+
+        function updateEditProdLifePreview() {
+            const input = document.getElementById('editProdLifeMonths');
+            const months = input ? parseInt(input.value) || 0 : 0;
+            const textBox = document.getElementById('editProdLifePreviewText');
+            const dateBox = document.getElementById('editProdLifePreviewTargetDate');
+            if (!textBox || !dateBox) return;
+
+            if (months > 0) {
+                const d = new Date();
+                d.setMonth(d.getMonth() + months);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const targetDate = `${yyyy}-${mm}-${dd}`;
+                textBox.innerHTML = `سيتم جدولة تذكير لخدمة العملاء بعد <b>${months} شهر</b> من تاريخ بيعه.`;
+                dateBox.textContent = `موعد اتصال خدمة العملاء: ${targetDate}`;
+                dateBox.style.display = 'inline-block';
+            } else {
+                textBox.innerHTML = `هذا الصنف بدون عداد زمني.`;
+                dateBox.style.display = 'none';
+            }
+        }
+
+        function toggleEditProductLifeFields(type) {
+            const mWrap = document.getElementById('editProd_months_wrap');
+            const lWrap = document.getElementById('editProd_liters_wrap');
+            if (!mWrap || !lWrap) return;
+            mWrap.style.display = (type === 'months' || type === 'both') ? 'block' : 'none';
+            lWrap.style.display = (type === 'liters' || type === 'both') ? 'block' : 'none';
+        }
+
+        // ============================================================
+        // حساب موعد التذكير التلقائي في فاتورة المبيعات وإرساله لخدمة العملاء
+        // ============================================================
+        function calcPosReminderDate() {
+            let maxMonths = 0;
+            let bestNote = '';
+            let bestName = '';
+            let selectedCount = 0;
+
+            document.querySelectorAll('#posItemsContainer .pos-prod-select').forEach(sel => {
+                const opt = sel.options[sel.selectedIndex];
+                if (!opt || !opt.value) return;
+                selectedCount++;
+                const months = parseInt(opt.getAttribute('data-life-months')) || 0;
+                const note   = opt.getAttribute('data-life-note') || '';
+                const name   = opt.text ? opt.text.split('(')[0].trim() : 'الصنف';
+                if (months > maxMonths) {
+                    maxMonths = months;
+                    bestNote  = note;
+                    bestName  = name;
+                }
+            });
+
+            const reminderInput = document.getElementById('posReminderDate');
+            const autoLabel     = document.getElementById('posReminderAutoLabel');
+            const autoBadge     = document.getElementById('posReminderAutoBadge');
+            const notesInput    = document.getElementById('posReminderNotes');
+            const orderDateEl   = document.querySelector('[name="order_date"]');
+
+            if (!reminderInput) return;
+
+            if (maxMonths > 0) {
+                let baseDate = new Date();
+                if (orderDateEl && orderDateEl.value) {
+                    baseDate = new Date(orderDateEl.value);
+                    if (isNaN(baseDate.getTime())) baseDate = new Date();
+                }
+                baseDate.setMonth(baseDate.getMonth() + maxMonths);
+                const yyyy = baseDate.getFullYear();
+                const mm   = String(baseDate.getMonth() + 1).padStart(2, '0');
+                const dd   = String(baseDate.getDate()).padStart(2, '0');
+                const calculatedDate = `${yyyy}-${mm}-${dd}`;
+                reminderInput.value = calculatedDate;
+
+                if (autoBadge) {
+                    autoBadge.style.display = 'inline-block';
+                    autoBadge.textContent = `⏱️ عداد الصنف: كل ${maxMonths} أشهر`;
+                }
+
+                if (autoLabel) {
+                    autoLabel.style.display = 'block';
+                    autoLabel.innerHTML = `✓ تم احتساب موعد تذكير خدمة العملاء تلقائياً بتاريخ: (<b>${calculatedDate}</b>) بعد <b>${maxMonths} أشهر</b> من تاريخ المعاملة لصنف: [${bestName}].`;
+                }
+
+                if (notesInput && (!notesInput.value || notesInput.value.includes('متابعة'))) {
+                    notesInput.value = bestNote || `متابعة استبدال فلتر (${bestName}) بعد ${maxMonths} شهر وفحص نسبة الأملاح TDS`;
+                }
+            } else {
+                if (autoBadge) autoBadge.style.display = 'none';
+                if (autoLabel) autoLabel.style.display = 'none';
+            }
+        }
+
         // Customers & Stations Helpers
         function openNewCustomerModal() {
             document.getElementById('newCustomerModal').classList.add('active');
@@ -8171,7 +8450,17 @@
         let posRowIndex = 1;
         const availableProducts = [
             @foreach($products as $p)
-            { id: {{ $p->id }}, sku: "{{ $p->sku }}", barcode: "{{ $p->barcode ?? '' }}", name: "{{ $p->name_ar }}", price: {{ (float)$p->selling_price }} },
+            {
+                id: {{ $p->id }},
+                sku: "{{ $p->sku }}",
+                barcode: "{{ $p->barcode ?? '' }}",
+                name: "{{ addslashes($p->name_ar) }}",
+                price: {{ (float)$p->selling_price }},
+                life_months: {{ (int)($p->filter_life_months ?? 0) }},
+                life_liters: {{ (int)($p->filter_life_liters ?? 0) }},
+                reminder_type: "{{ $p->reminder_type ?? 'months' }}",
+                life_note: "{{ addslashes($p->filter_life_note ?? '') }}"
+            },
             @endforeach
         ];
 
@@ -8435,7 +8724,7 @@
             
             let optionsHtml = '<option value="">اختر الصنف...</option>';
             availableProducts.forEach(p => {
-                optionsHtml += `<option value="${p.id}" data-price="${p.price}">${p.name} (${p.sku}) — ${p.price.toFixed(2)} ر.س</option>`;
+                optionsHtml += `<option value="${p.id}" data-price="${p.price}" data-life-months="${p.life_months || 0}" data-life-liters="${p.life_liters || 0}" data-reminder-type="${p.reminder_type || 'months'}" data-life-note="${p.life_note || ''}">${p.name} (${p.sku}) — ${p.price.toFixed(2)} ر.س</option>`;
             });
 
             const rowHtml = `
@@ -8443,7 +8732,7 @@
                     <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label>الصنف:</label>
-                            <select name="items[${idx}][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(${idx}, this)" required>
+                            <select name="items[${idx}][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(${idx}, this); calcPosReminderDate();" required>
                                 ${optionsHtml}
                             </select>
                         </div>
@@ -8470,6 +8759,7 @@
             const row = document.getElementById('posRow_' + idx);
             if (row) row.remove();
             calculatePosTotals();
+            calcPosReminderDate();
         }
 
         function updatePosItemPrice(idx, selectEl) {
@@ -8478,6 +8768,7 @@
             const priceInput = document.getElementById('posUnitPrice_' + idx);
             if (priceInput) priceInput.value = price.toFixed(2);
             calculatePosTotals();
+            calcPosReminderDate();
         }
 
         function calculatePosTotals() {

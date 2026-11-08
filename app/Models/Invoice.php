@@ -28,18 +28,24 @@ class Invoice extends Model
         'status',
         'cancellation_reason',
         'created_by',
+        'reminder_date',
+        'reminder_sent',
+        'reminder_sent_at',
+        'reminder_notes',
     ];
 
     protected function casts(): array
     {
         return [
-            'subtotal' => 'decimal:4',
+            'subtotal'        => 'decimal:4',
             'discount_amount' => 'decimal:4',
-            'tax_amount' => 'decimal:4',
-            'grand_total' => 'decimal:4',
-            'paid_amount' => 'decimal:4',
-            'balance_due' => 'decimal:4',
-            'invoice_date' => 'date',
+            'tax_amount'      => 'decimal:4',
+            'grand_total'     => 'decimal:4',
+            'paid_amount'     => 'decimal:4',
+            'balance_due'     => 'decimal:4',
+            'invoice_date'    => 'date',
+            'reminder_date'   => 'date',
+            'reminder_sent'   => 'boolean',
         ];
     }
 
