@@ -503,11 +503,15 @@ class DashboardController extends Controller
             'notes' => 'nullable|string',
             'reminder_date'  => 'nullable|date',
             'reminder_notes' => 'nullable|string|max:500',
+            'customer_device_id' => 'nullable|exists:customer_devices,id',
+            'service_type'       => 'nullable|string|max:100',
+            'technician_id'      => 'nullable|exists:users,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
+            'items.*.tax' => 'nullable|numeric|min:0',
         ]);
 
         // تحديد أو إنشاء العميل
@@ -586,10 +590,16 @@ class DashboardController extends Controller
                 $invoice->save();
 
                 // 1. تحديد أو إنشاء جهاز عميل (CustomerDevice)
-                $device = CustomerDevice::where('customer_id', $customer->id)
-                    ->where('status', 'active')
-                    ->latest()
-                    ->first();
+                $device = null;
+                if (!empty($validated['customer_device_id'])) {
+                    $device = CustomerDevice::where('customer_id', $customer->id)->find($validated['customer_device_id']);
+                }
+                if (!$device) {
+                    $device = CustomerDevice::where('customer_id', $customer->id)
+                        ->where('status', 'active')
+                        ->latest()
+                        ->first();
+                }
 
                 if (!$device) {
                     $defaultModel = DeviceModel::first();

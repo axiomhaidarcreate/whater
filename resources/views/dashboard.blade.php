@@ -2481,10 +2481,14 @@
                         </p>
                     </div>
 
-                    <div style="display: flex; gap: 0.75rem;">
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
                         <button class="btn btn-success" onclick="openNewSaleModal()">
                             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             <span>+ إنشاء فاتورة بيع جديدة / نقطة بيع POS</span>
+                        </button>
+                        <button class="btn btn-primary" onclick="openNewServiceInvoiceModal()" style="background: linear-gradient(135deg, #0284c7, #0369a1); border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <span>🛠️ + إنشاء فاتورة خدمة (عميل موجود / صيانة)</span>
                         </button>
                     </div>
                 </div>
@@ -4938,7 +4942,8 @@
                             <h2 class="card-title"><span style="color: #38bdf8;">💰</span><span>دفتر الفواتير والتحصيل المالي والقيود</span></h2>
                             <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">أرشفة كاملة لكافة الحركات المالية وسندات القبض</p>
                         </div>
-                        <button class="btn btn-success" onclick="openNewSaleModal()">+ فاتورة جديدة</button>
+                        <button class="btn btn-success" onclick="openNewSaleModal()">+ فاتورة بيع</button>
+                        <button class="btn btn-primary" onclick="openNewServiceInvoiceModal()" style="background: linear-gradient(135deg, #0284c7, #0369a1); font-size: 0.82rem; margin-right: 0.4rem;">🛠️ + فاتورة خدمة (صيانة)</button>
                     </div>
 
                     <div class="table-responsive">
@@ -5848,6 +5853,220 @@
                     </button>
                     <button type="submit" class="btn btn-success" style="font-size: 0.95rem; padding: 0.6rem 1.8rem;">
                         ✓ تأكيد العملية وإصدار الفاتورة فورياً
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Service Invoice (إنشاء فاتورة خدمة لعميل موجود / صيانة) -->
+    <div id="newServiceInvoiceModal" class="modal">
+        <div class="modal-content modal-lg" style="max-width: 920px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(2,132,199,0.1), rgba(16,185,129,0.05)); padding: 1.2rem 1.5rem; border-bottom: 2px solid #0284c7;">
+                <h3 style="font-weight: 800; color: #0284c7; display: flex; align-items: center; gap: 0.6rem; margin: 0; font-size: 1.15rem;">
+                    <span>🛠️</span>
+                    <span>إصدار فاتورة خدمة وصيانة لعميل مسجل في النظام</span>
+                </h3>
+                <button class="close-btn" onclick="closeModal('newServiceInvoiceModal')">&times;</button>
+            </div>
+
+            <form action="{{ route('sales.create') }}" method="POST" id="serviceInvoiceForm">
+                @csrf
+                <input type="hidden" name="customer_type" value="existing">
+                <input type="hidden" name="sale_type" value="invoice">
+
+                <!-- الصف الأول: اختيار العميل + اختيار جهاز العميل -->
+                <div class="form-row" style="grid-template-columns: 1.5fr 1.2fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 700; color: #0f172a;">اختر العميل المسجل: <span style="color:#ef4444">*</span></label>
+                        <select name="customer_id" id="serviceCustSelect" class="form-control" onchange="onServiceCustomerChange(this)" required style="border-color: #0284c7; font-weight: 600;">
+                            <option value="">-- اختر العميل من قاعدة البيانات --</option>
+                            @foreach($customers as $c)
+                            <option value="{{ $c->id }}"
+                                data-phone="{{ $c->primary_phone }}"
+                                data-city="{{ $c->addresses->first()?->city ?? 'الرياض' }}"
+                                data-devices='@json($c->devices->map(fn($d) => [
+                                    "id" => $d->id,
+                                    "code" => $d->device_code,
+                                    "name" => ($d->model?->name ?? "محطة تحلية"),
+                                    "serial" => $d->serial_number ?? ""
+                                ])) '>
+                                {{ $c->name }} ({{ $c->primary_phone }}) — {{ $c->customer_code }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-weight: 700; color: #0f172a;">جهاز / محطة العميل المستهدفة:</label>
+                        <select name="customer_device_id" id="serviceDeviceSelect" class="form-control">
+                            <option value="">-- اختر العميل أولاً لعرض أجهزته --</option>
+                        </select>
+                        <div id="serviceCustPhoneHint" style="font-size: 11.5px; color: #0284c7; margin-top: 4px; font-weight: 600;"></div>
+                    </div>
+                </div>
+
+                <!-- الصف الثاني: نوع الخدمة + فني الصيانة + مستودع الصرف + التاريخ -->
+                <div class="form-row" style="grid-template-columns: 1.2fr 1.2fr 1fr 1fr; gap: 0.75rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 700;">نوع الخدمة / الصيانة: <span style="color:#ef4444">*</span></label>
+                        <select name="service_type" id="serviceTypeSelect" class="form-control" onchange="onServiceTypeChange(this.value)" required>
+                            <option value="routine_maintenance">🔧 صيانة دورية واستبدال شمعات</option>
+                            <option value="membrane_replacement">💧 استبدال غشاء الممبرين RO</option>
+                            <option value="tds_check_calibration">🧪 فحص نسبة الأملاح TDS ومعايرة</option>
+                            <option value="pump_repair">⚙️ إصلاح أو استبدال مضخة مياه</option>
+                            <option value="leak_pressure_check">🚰 فحص ضغط وتهريب مياه</option>
+                            <option value="spare_parts_install">📦 تركيب قطع غيار وملحقات</option>
+                            <option value="general_service">🛠️ خدمة صيانة عامة وشاملة</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>فني الصيانة المنفذ (اختياري):</label>
+                        <select name="technician_id" class="form-control">
+                            <option value="">-- بدون تحديد فني محدد --</option>
+                            @foreach($technicians as $t)
+                            <option value="{{ $t->id }}">{{ $t->full_name_ar ?: $t->name }} ({{ $t->phone }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>مستودع الصرف:</label>
+                        <select name="warehouse_id" class="form-control" required>
+                            @foreach($warehouses as $w)
+                            <option value="{{ $w->id }}">{{ $w->name }} ({{ $w->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>تاريخ الخدمة:</label>
+                        <input type="date" name="order_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                    </div>
+                </div>
+
+                <!-- بنود الفاتورة وقطع الغيار والخدمات -->
+                <div style="margin-top: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <label style="font-weight: 800; color: #0284c7; display: flex; align-items: center; gap: 6px;">
+                            <span>📦</span>
+                            <span>قطع الغيار والشمعات وأجور الخدمة المضافة:</span>
+                        </label>
+                        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; color: #0284c7; border-color: #38bdf8;" onclick="addServiceItemRow()">
+                            + إضافة بند خدمة / قطعة غيار إضافية
+                        </button>
+                    </div>
+
+                    <div id="serviceItemsContainer">
+                        <div class="pos-item-box" id="serviceRow_0">
+                            <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>البند / القطعة / الخدمة:</label>
+                                    <select name="items[0][product_id]" class="form-control service-prod-select" onchange="updateServiceItemPrice(0, this); calcServiceReminderDate();" required>
+                                        <option value="">اختر الصنف / الشمعة / الخدمة...</option>
+                                        @foreach($products as $p)
+                                        <option value="{{ $p->id }}"
+                                            data-price="{{ (float)$p->selling_price }}"
+                                            data-life-months="{{ (int)($p->filter_life_months ?? 0) }}"
+                                            data-life-liters="{{ (int)($p->filter_life_liters ?? 0) }}"
+                                            data-reminder-type="{{ $p->reminder_type ?? 'months' }}"
+                                            data-life-note="{{ $p->filter_life_note ?? '' }}">
+                                            {{ $p->name_ar }} ({{ $p->sku }}) — {{ number_format($p->selling_price, 2) }} ر.س
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>سعر الوحدة:</label>
+                                    <input type="number" step="0.01" name="items[0][unit_price]" id="serviceUnitPrice_0" class="form-control num" placeholder="0.00" oninput="calculateServiceTotals()" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>الكمية:</label>
+                                    <input type="number" name="items[0][quantity]" id="serviceQty_0" class="form-control num" value="1" min="1" oninput="calculateServiceTotals()" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>الضريبة (15%):</label>
+                                    <input type="number" step="0.01" name="items[0][tax]" id="serviceTax_0" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;">
+                                    <input type="hidden" name="items[0][discount]" value="0.00">
+                                </div>
+                                <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removeServiceItemRow(0)">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- طريقة السداد والمبلغ والملاحظات -->
+                <div class="form-row-3" style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 10px; margin-bottom: 1.25rem;">
+                    <div class="form-group">
+                        <label>طريقة السداد:</label>
+                        <select name="payment_method" class="form-control" required>
+                            <option value="mada_pos">شبكة مدى (Mada POS)</option>
+                            <option value="cash">نقداً (Cash)</option>
+                            <option value="bank_transfer">تحويل بنكي</option>
+                            <option value="credit_card">بطاقة ائتمانية</option>
+                            <option value="credit">آجل (ذمم مدينة)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>المبلغ المدفوع الآن:</label>
+                        <input type="number" step="0.01" name="paid_amount" id="servicePaidAmount" class="form-control num" value="0.00">
+                    </div>
+
+                    <div class="form-group">
+                        <label>تقرير الصيانة وملاحظات الفني:</label>
+                        <input type="text" name="notes" id="serviceNotesInput" class="form-control" placeholder="مثال: تم تغيير شمعات 1 و 2 و 3 وفحص ضغط المياه ونسبة الأملاح 120 TDS">
+                    </div>
+                </div>
+
+                <!-- قسم التذكير التلقائي لخدمة العملاء بالصيانة القادمة -->
+                <div id="serviceReminderSection" style="background: linear-gradient(135deg, rgba(2,132,199,0.09), rgba(16,185,129,0.06)); border: 1.5px solid rgba(2,132,199,0.35); border-radius: 12px; padding: 1.1rem 1.3rem; margin-bottom: 1.25rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.6rem; flex-wrap:wrap; gap:6px;">
+                        <div style="font-weight: 800; color: #0284c7; font-size: 0.98rem; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.2rem;">🔔</span>
+                            <span>موعد الصيانة الدورية القادمة (تذكير خدمة العملاء)</span>
+                        </div>
+                        <span id="serviceReminderAutoBadge" style="font-size:11.5px; background:#0284c7; color:#fff; padding:3px 10px; border-radius:6px; font-weight:700; display:none;">
+                            ⏱️ محسوب من عداد الصيانة
+                        </span>
+                    </div>
+
+                    <div style="font-size: 12px; color: #334155; margin-bottom: 0.8rem; background:rgba(255,255,255,0.7); padding:6px 10px; border-radius:6px; border:1px solid rgba(2,132,199,0.2);">
+                        ✓ بمجرد اعتماد فاتورة الخدمة، سيتم جدولة موعد الصيانة الدورية القادمة لخدمة العملاء في <b>استحقاقات الفلاتر</b> للتواصل مع العميل بالموعد المحدد.
+                    </div>
+
+                    <div class="form-row" style="grid-template-columns: 1.2fr 2fr; gap: 0.85rem; align-items: flex-end;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label style="font-weight:700; color:#0f172a;">تاريخ الصيانة / التذكير القادم:</label>
+                            <input type="date" name="reminder_date" id="serviceReminderDate" class="form-control" style="font-weight:700; border-color:#0284c7; font-size:13.5px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label style="font-weight:700; color:#0f172a;">توجيهات الاتصال القادم لخدمة العملاء:</label>
+                            <input type="text" name="reminder_notes" id="serviceReminderNotes" class="form-control" placeholder="مثال: موعد الصيانة القادمة لفحص المحطة وتغيير الفلاتر">
+                        </div>
+                    </div>
+                    <div id="serviceReminderAutoLabel" style="font-size:12px; color:#0284c7; margin-top:8px; font-weight:700; display:none;"></div>
+                </div>
+
+                <!-- إجمالي الفاتورة المباشر -->
+                <div style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">إجمالي الخدمات والقطع قبل الضريبة: <span id="serviceSubtotalDisp" class="num" style="color: #0f172a; font-weight: 700;">0.00</span> ر.س</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">ضريبة القيمة المضافة (15%): <span id="serviceTaxDisp" class="num" style="color: #0f172a; font-weight: 700;">0.00</span> ر.س</div>
+                        </div>
+                        <div style="text-align: left;">
+                            <div style="font-size: 0.85rem; color: #0284c7; font-weight: 700;">الإجمالي الكلي النهائي للخدمة:</div>
+                            <div id="serviceGrandTotalDisp" class="num" style="font-size: 1.8rem; font-weight: 800; color: #0284c7;">0.00 ر.س</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('newServiceInvoiceModal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #0369a1); font-size: 0.95rem; padding: 0.6rem 1.8rem; font-weight: 700;">
+                        ✓ إصدار فاتورة الخدمة واعتماد الصيانة
                     </button>
                 </div>
             </form>
@@ -7572,7 +7791,8 @@
         }
 
         // Modal Controls
-        function openNewSaleModal() { document.getElementById('newSaleModal').classList.add('active'); }
+        function openNewSaleModal() { openModal('newSaleModal'); }
+        function openNewServiceInvoiceModal() { openModal('newServiceInvoiceModal'); }
         function openNewSupplierModal() { document.getElementById('newSupplierModal').classList.add('active'); }
         function openNewProductModal() {
             document.getElementById('newProductModal').classList.add('active');
@@ -7775,6 +7995,208 @@
         // ============================================================
         // Purchase Order - Dynamic Items
         // ============================================================
+        // ============================================================
+        // JavaScript Helpers for Service Invoice Modal
+        // ============================================================
+        let serviceRowIndex = 1;
+
+        function onServiceCustomerChange(sel) {
+            const opt = sel.options[sel.selectedIndex];
+            const devSelect = document.getElementById('serviceDeviceSelect');
+            const hint = document.getElementById('serviceCustPhoneHint');
+            if (!devSelect) return;
+
+            devSelect.innerHTML = '';
+
+            if (!opt || !opt.value) {
+                devSelect.innerHTML = '<option value="">-- اختر العميل أولاً لعرض أجهزته --</option>';
+                if (hint) hint.textContent = '';
+                return;
+            }
+
+            const phone = opt.getAttribute('data-phone') || '';
+            const city = opt.getAttribute('data-city') || '';
+            if (hint) hint.textContent = `📞 الجوال: ${phone} | 📍 المدينة: ${city}`;
+
+            let devices = [];
+            try {
+                devices = JSON.parse(opt.getAttribute('data-devices') || '[]');
+            } catch (e) { devices = []; }
+
+            if (devices.length > 0) {
+                devSelect.innerHTML = '<option value="">-- اختر المحطة / الجهاز المراد صيانته --</option>';
+                devices.forEach(d => {
+                    const optDev = document.createElement('option');
+                    optDev.value = d.id;
+                    optDev.textContent = `${d.name} (${d.code}) ${d.serial ? ' - SN: ' + d.serial : ''}`;
+                    devSelect.appendChild(optDev);
+                });
+            } else {
+                devSelect.innerHTML = '<option value="">✓ لا يوجد جهاز مسجل (سيتم ربط الصيانة بالعميل مباشرة)</option>';
+            }
+        }
+
+        function onServiceTypeChange(val) {
+            const notes = document.getElementById('serviceNotesInput');
+            if (!notes || notes.value) return;
+            const labels = {
+                'routine_maintenance': 'صيانة دورية واستبدال شمعات فلاتر',
+                'membrane_replacement': 'استبدال غشاء الممبرين RO وفحص نسبة الأملاح',
+                'tds_check_calibration': 'فحص نسبة الأملاح TDS ومعايرة المحطة',
+                'pump_repair': 'إصلاح/استبدال مضخة المياه وفحص ضغط الخط',
+                'leak_pressure_check': 'فحص ومعالجة تهريب المياه وضبط الضغط',
+                'spare_parts_install': 'تركيب قطع غيار وملحقات صيانة',
+                'general_service': 'خدمة صيانة دورية عامة للمحطة'
+            };
+            notes.value = labels[val] || '';
+        }
+
+        function addServiceItemRow() {
+            const idx = serviceRowIndex++;
+            const container = document.getElementById('serviceItemsContainer');
+            let optionsHtml = '<option value="">اختر الصنف / الشمعة / الخدمة...</option>';
+            availableProducts.forEach(p => {
+                optionsHtml += `<option value="${p.id}" data-price="${p.price}" data-life-months="${p.life_months || 0}" data-life-liters="${p.life_liters || 0}" data-reminder-type="${p.reminder_type || 'months'}" data-life-note="${p.life_note || ''}">${p.name} (${p.sku}) — ${p.price.toFixed(2)} ر.س</option>`;
+            });
+
+            const rowHtml = `
+                <div class="pos-item-box" id="serviceRow_${idx}">
+                    <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>البند / القطعة / الخدمة:</label>
+                            <select name="items[${idx}][product_id]" class="form-control service-prod-select" onchange="updateServiceItemPrice(${idx}, this); calcServiceReminderDate();" required>
+                                ${optionsHtml}
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>سعر الوحدة:</label>
+                            <input type="number" step="0.01" name="items[${idx}][unit_price]" id="serviceUnitPrice_${idx}" class="form-control num" placeholder="0.00" oninput="calculateServiceTotals()" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>الكمية:</label>
+                            <input type="number" name="items[${idx}][quantity]" id="serviceQty_${idx}" class="form-control num" value="1" min="1" oninput="calculateServiceTotals()" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>الضريبة (15%):</label>
+                            <input type="number" step="0.01" name="items[${idx}][tax]" id="serviceTax_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;">
+                            <input type="hidden" name="items[${idx}][discount]" value="0.00">
+                        </div>
+                        <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removeServiceItemRow(${idx})">&times;</button>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
+
+        function removeServiceItemRow(idx) {
+            const row = document.getElementById('serviceRow_' + idx);
+            if (row) row.remove();
+            calculateServiceTotals();
+            calcServiceReminderDate();
+        }
+
+        function updateServiceItemPrice(idx, selectEl) {
+            const opt = selectEl.options[selectEl.selectedIndex];
+            const price = parseFloat(opt ? opt.getAttribute('data-price') : 0) || 0;
+            const priceInput = document.getElementById('serviceUnitPrice_' + idx);
+            if (priceInput) priceInput.value = price.toFixed(2);
+            calculateServiceTotals();
+            calcServiceReminderDate();
+        }
+
+        function calculateServiceTotals() {
+            let subtotal = 0;
+            let totalTax = 0;
+
+            document.querySelectorAll('#serviceItemsContainer .pos-item-box').forEach(box => {
+                const priceInput = box.querySelector('input[name*="[unit_price]"]');
+                const qtyInput   = box.querySelector('input[name*="[quantity]"]');
+                const taxInput   = box.querySelector('input[id^="serviceTax_"]');
+
+                const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
+                const qty   = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+                const lineSub = price * qty;
+                const lineTax = lineSub * 0.15;
+
+                if (taxInput) taxInput.value = lineTax.toFixed(2);
+                subtotal += lineSub;
+                totalTax += lineTax;
+            });
+
+            const grandTotal = subtotal + totalTax;
+            const subDisp = document.getElementById('serviceSubtotalDisp');
+            const taxDisp = document.getElementById('serviceTaxDisp');
+            const grandDisp = document.getElementById('serviceGrandTotalDisp');
+
+            if (subDisp) subDisp.innerText = subtotal.toFixed(2);
+            if (taxDisp) taxDisp.innerText = totalTax.toFixed(2);
+            if (grandDisp) grandDisp.innerText = grandTotal.toFixed(2) + ' ر.س';
+
+            const paidInput = document.getElementById('servicePaidAmount');
+            if (paidInput && (!paidInput.value || parseFloat(paidInput.value) === 0)) {
+                // leave as 0 or let user enter
+            }
+        }
+
+        function calcServiceReminderDate() {
+            let maxMonths = 0;
+            let bestNote = '';
+            let bestName = '';
+
+            document.querySelectorAll('#serviceItemsContainer .service-prod-select').forEach(sel => {
+                const opt = sel.options[sel.selectedIndex];
+                if (!opt || !opt.value) return;
+                const months = parseInt(opt.getAttribute('data-life-months')) || 0;
+                const note   = opt.getAttribute('data-life-note') || '';
+                const name   = opt.text ? opt.text.split('(')[0].trim() : 'الصنف';
+                if (months > maxMonths) {
+                    maxMonths = months;
+                    bestNote  = note;
+                    bestName  = name;
+                }
+            });
+
+            // إذا لم يتم تحديد صنف بعداد، نضع افتراضياً 6 أشهر للصيانة الدورية
+            if (maxMonths === 0) {
+                maxMonths = 6;
+                bestName = 'صيانة دورية فلاتر';
+            }
+
+            const reminderInput = document.getElementById('serviceReminderDate');
+            const autoLabel     = document.getElementById('serviceReminderAutoLabel');
+            const autoBadge     = document.getElementById('serviceReminderAutoBadge');
+            const notesInput    = document.getElementById('serviceReminderNotes');
+            const orderDateEl   = document.querySelector('#serviceInvoiceForm [name="order_date"]');
+
+            if (!reminderInput) return;
+
+            let baseDate = new Date();
+            if (orderDateEl && orderDateEl.value) {
+                baseDate = new Date(orderDateEl.value);
+                if (isNaN(baseDate.getTime())) baseDate = new Date();
+            }
+            baseDate.setMonth(baseDate.getMonth() + maxMonths);
+            const yyyy = baseDate.getFullYear();
+            const mm   = String(baseDate.getMonth() + 1).padStart(2, '0');
+            const dd   = String(baseDate.getDate()).padStart(2, '0');
+            const calculatedDate = `${yyyy}-${mm}-${dd}`;
+            reminderInput.value = calculatedDate;
+
+            if (autoBadge) {
+                autoBadge.style.display = 'inline-block';
+                autoBadge.textContent = `⏱️ موعد الصيانة القادمة: بعد ${maxMonths} أشهر`;
+            }
+
+            if (autoLabel) {
+                autoLabel.style.display = 'block';
+                autoLabel.innerHTML = `✓ تم احتساب موعد الصيانة القادمة لخدمة العملاء بتاريخ: (<b>${calculatedDate}</b>) بعد <b>${maxMonths} أشهر</b>.`;
+            }
+
+            if (notesInput && (!notesInput.value || notesInput.value.includes('الصيانة القادمة'))) {
+                notesInput.value = bestNote || `موعد الصيانة الدورية واستبدال شمعات (${bestName}) بعد ${maxMonths} شهر`;
+            }
+        }
+
         var poItemIndex = 0;
         var poAvailableProducts = @json($products->map(fn($p) => ['id'=>$p->id,'name'=>$p->name_ar.' ('.$p->sku.')','cost'=>(float)$p->cost_price])->values());
 
