@@ -5740,8 +5740,9 @@
                                     <input type="number" name="items[0][quantity]" id="posQty_0" class="form-control num" value="1" min="1" oninput="calculatePosTotals()" required>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>الخصم:</label>
-                                    <input type="number" step="0.01" name="items[0][discount]" id="posDisc_0" class="form-control num" value="0.00" oninput="calculatePosTotals()">
+                                    <label>الضريبة (15%):</label>
+                                    <input type="number" step="0.01" name="items[0][tax]" id="posTax_0" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;" title="ضريبة القيمة المضافة 15% تحسب تلقائياً">
+                                    <input type="hidden" name="items[0][discount]" value="0.00">
                                 </div>
                                 <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removePosItemRow(0)">&times;</button>
                             </div>
@@ -8573,11 +8574,11 @@
                 const prodName = prodSel.options[prodSel.selectedIndex].text;
                 const price = parseFloat(box.querySelector('input[name*="[unit_price]"]')?.value || 0);
                 const qty = parseInt(box.querySelector('input[name*="[quantity]"]')?.value || 1);
-                const disc = parseFloat(box.querySelector('input[name*="[discount]"]')?.value || 0);
-                const lineTotal = (price * qty) - disc;
+                const lineSub = price * qty;
+                const lineTax = lineSub * 0.15;
+                const lineTotal = lineSub + lineTax;
 
-                subtotal += (price * qty);
-                totalDisc += disc;
+                subtotal += lineSub;
                 totalQty += qty;
 
                 rows += `
@@ -8586,7 +8587,7 @@
                         <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${prodName}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">${qty}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left;">${price.toFixed(2)} ر.س</td>
-                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left;">${disc.toFixed(2)} ر.س</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; color:#10b981; font-weight:600;">${lineTax.toFixed(2)} ر.س</td>
                         <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; font-weight: 700;">${lineTotal.toFixed(2)} ر.س</td>
                     </tr>
                 `;
@@ -8655,7 +8656,7 @@
                                 <th style="width: 45%;">الصنف</th>
                                 <th style="width: 10%; text-align: center;">الكمية</th>
                                 <th style="width: 15%; text-align: left;">سعر الوحدة</th>
-                                <th style="width: 10%; text-align: left;">الخصم</th>
+                                <th style="width: 10%; text-align: left;">الضريبة (15%)</th>
                                 <th style="width: 15%; text-align: left;">الإجمالي</th>
                             </tr>
                         </thead>
@@ -8729,8 +8730,9 @@
                             <input type="number" name="items[${idx}][quantity]" id="posQty_${idx}" class="form-control num" value="1" min="1" oninput="calculatePosTotals()" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>الخصم:</label>
-                            <input type="number" step="0.01" name="items[${idx}][discount]" id="posDisc_${idx}" class="form-control num" value="0.00" oninput="calculatePosTotals()">
+                            <label>الضريبة (15%):</label>
+                            <input type="number" step="0.01" name="items[${idx}][tax]" id="posTax_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;" title="ضريبة القيمة المضافة 15% تحسب تلقائياً">
+                            <input type="hidden" name="items[${idx}][discount]" value="0.00">
                         </div>
                         <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removePosItemRow(${idx})">&times;</button>
                     </div>
@@ -8757,27 +8759,30 @@
 
         function calculatePosTotals() {
             let subtotal = 0;
-            let totalDiscount = 0;
+            let totalTax = 0;
 
             document.querySelectorAll('#posItemsContainer .pos-item-box').forEach(box => {
                 const priceInput = box.querySelector('input[name*="[unit_price]"]');
-                const qtyInput = box.querySelector('input[name*="[quantity]"]');
-                const discInput = box.querySelector('input[name*="[discount]"]');
+                const qtyInput   = box.querySelector('input[name*="[quantity]"]');
+                const taxInput   = box.querySelector('input[id^="posTax_"]');
 
                 const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
-                const qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
-                const disc = parseFloat(discInput ? discInput.value : 0) || 0;
+                const qty   = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+                const lineSub = price * qty;
+                const lineTax = lineSub * 0.15;
 
-                subtotal += (price * qty);
-                totalDiscount += disc;
+                if (taxInput) {
+                    taxInput.value = lineTax.toFixed(2);
+                }
+
+                subtotal += lineSub;
+                totalTax += lineTax;
             });
 
-            const netSubtotal = Math.max(0, subtotal - totalDiscount);
-            const vat = netSubtotal * 0.15;
-            const grandTotal = netSubtotal + vat;
+            const grandTotal = subtotal + totalTax;
 
-            document.getElementById('posSubtotalDisp').innerText = netSubtotal.toFixed(2);
-            document.getElementById('posTaxDisp').innerText = vat.toFixed(2);
+            document.getElementById('posSubtotalDisp').innerText = subtotal.toFixed(2);
+            document.getElementById('posTaxDisp').innerText = totalTax.toFixed(2);
             document.getElementById('posGrandTotalDisp').innerText = grandTotal.toFixed(2) + ' ر.س';
 
             // Update Live QR Code & Barcode under totals
