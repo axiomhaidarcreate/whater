@@ -5885,12 +5885,7 @@
                             <option value="{{ $c->id }}"
                                 data-phone="{{ $c->primary_phone }}"
                                 data-city="{{ $c->addresses->first()?->city ?? 'الرياض' }}"
-                                data-devices='@json($c->devices->map(fn($d) => [
-                                    "id" => $d->id,
-                                    "code" => $d->device_code,
-                                    "name" => ($d->model?->name ?? "محطة تحلية"),
-                                    "serial" => $d->serial_number ?? ""
-                                ])) '>
+                                data-devices="{{ json_encode($c->devices->map(fn($d) => ['id' => $d->id, 'code' => $d->device_code, 'name' => ($d->model?->name ?? 'محطة تحلية'), 'serial' => ($d->serial_number ?? '')])) }}">
                                 {{ $c->name }} ({{ $c->primary_phone }}) — {{ $c->customer_code }}
                             </option>
                             @endforeach
