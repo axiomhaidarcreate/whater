@@ -5719,9 +5719,9 @@
 
                     <div id="posItemsContainer">
                         <div class="pos-item-box" id="posRow_0">
-                            <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                            <div class="form-row" style="grid-template-columns: 2.2fr 1fr 0.8fr 1fr 1fr 1.1fr auto; align-items: flex-end; gap: 0.5rem;">
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>الصنف:</label>
+                                    <label style="font-size: 11.5px; font-weight: 700;">الصنف:</label>
                                     <select name="items[0][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(0, this); calcPosReminderDate();" required>
                                         <option value="">اختر الصنف...</option>
                                         @foreach($products as $p)
@@ -5737,29 +5737,53 @@
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>سعر الوحدة:</label>
+                                    <label style="font-size: 11.5px; font-weight: 700;">سعر الوحدة:</label>
                                     <input type="number" step="0.01" name="items[0][unit_price]" id="posUnitPrice_0" class="form-control num" placeholder="0.00" oninput="calculatePosTotals()" required>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>الكمية:</label>
+                                    <label style="font-size: 11.5px; font-weight: 700;">العدد / الكمية:</label>
                                     <input type="number" name="items[0][quantity]" id="posQty_0" class="form-control num" value="1" min="1" oninput="calculatePosTotals()" required>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>الضريبة (15%):</label>
-                                    <input type="number" step="0.01" name="items[0][tax]" id="posTax_0" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;" title="ضريبة القيمة المضافة 15% تحسب تلقائياً">
+                                    <label style="font-size: 11.5px; font-weight: 700; color: #475569;">الإجمالي:</label>
+                                    <input type="text" id="posLineSub_0" class="form-control num" value="0.00" readonly style="background: #f8fafc; font-weight: 700; color: #334155;" title="الإجمالي قبل الضريبة">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 11.5px; font-weight: 700; color: #059669;">الضريبة (15%):</label>
+                                    <input type="number" step="0.01" name="items[0][tax]" id="posTax_0" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #059669; font-weight: 700;" title="ضريبة القيمة المضافة 15% تحسب تلقائياً">
                                     <input type="hidden" name="items[0][discount]" value="0.00">
                                 </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 11.5px; font-weight: 700; color: #0284c7;">المجموع:</label>
+                                    <input type="text" id="posLineTotal_0" class="form-control num" value="0.00" readonly style="background: rgba(2,132,199,0.08); color: #0284c7; font-weight: 800;" title="المجموع شامل الضريبة">
+                                </div>
                                 <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removePosItemRow(0)">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- شريط عدادات وملخص إجمالي الأصناف -->
+                    <div id="posItemsCountersBar" style="background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 0.65rem 1rem; margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                        <div style="font-size: 12px; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 6px;">
+                            <span>📊 عدادات الأصناف والإجمالي:</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 12px;">
+                            <div>إجمالي العدد: <b id="posTotalQtyCounter" class="num" style="color: #0f172a; font-size: 13.5px; font-weight: 800;">1</b> قطعة</div>
+                            <div>الإجمالي قبل الضريبة: <b id="posTotalSubCounter" class="num" style="color: #0f172a; font-size: 13.5px; font-weight: 800;">0.00</b> ر.س</div>
+                            <div>الضريبة (15%): <b id="posTotalTaxCounter" class="num" style="color: #059669; font-size: 13.5px; font-weight: 800;">0.00</b> ر.س</div>
+                            <div style="background: #10b981; color: #fff; padding: 3px 12px; border-radius: 6px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>المجموع الكلي:</span>
+                                <span id="posTotalGrandCounter" class="num" style="font-size: 14px;">0.00 ر.س</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Payment Details -->
-                <div class="form-row-3" style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 10px; margin-bottom: 1.25rem;">
+                <div class="form-row-3" style="background: #334155; padding: 1rem 1.25rem; border-radius: 10px; margin-bottom: 1.25rem; border: 1px solid #475569;">
                     <div class="form-group">
-                        <label>طريقة السداد:</label>
-                        <select name="payment_method" id="posPaymentMethod" class="form-control" onchange="handlePaymentMethodChange(this.value)" required>
+                        <label style="color: #ffffff; font-weight: 700; font-size: 13px;">طريقة السداد: <span style="color: #38bdf8;">*</span></label>
+                        <select name="payment_method" id="posPaymentMethod" class="form-control" onchange="handlePaymentMethodChange(this.value)" required style="border-color: #64748b;">
                             <option value="mada_pos">شبكة مدى (Mada POS)</option>
                             <option value="cash">نقداً (Cash)</option>
                             <option value="bank_transfer">تحويل بنكي</option>
@@ -5769,13 +5793,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label>المبلغ المدفوع الآن:</label>
-                        <input type="number" step="0.01" name="paid_amount" id="posPaidAmount" class="form-control num" value="0.00">
+                        <label style="color: #ffffff; font-weight: 700; font-size: 13px;">المبلغ المدفوع الآن: <span style="color: #38bdf8;">*</span></label>
+                        <input type="number" step="0.01" name="paid_amount" id="posPaidAmount" class="form-control num" value="0.00" style="border-color: #64748b; font-weight: 700;">
                     </div>
 
                     <div class="form-group">
-                        <label>ملاحظات إضافية:</label>
-                        <input type="text" name="notes" class="form-control" placeholder="اختياري...">
+                        <label style="color: #ffffff; font-weight: 700; font-size: 13px;">ملاحظات إضافية:</label>
+                        <input type="text" name="notes" class="form-control" placeholder="اختياري..." style="border-color: #64748b;">
                     </div>
                 </div>
 
@@ -5955,9 +5979,9 @@
 
                     <div id="serviceItemsContainer">
                         <div class="pos-item-box" id="serviceRow_0">
-                            <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                            <div class="form-row" style="grid-template-columns: 2.2fr 1fr 0.8fr 1fr 1fr 1.1fr auto; align-items: flex-end; gap: 0.5rem;">
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>البند / القطعة / الخدمة:</label>
+                                    <label style="font-size: 11.5px; font-weight: 700;">البند / القطعة / الخدمة:</label>
                                     <select name="items[0][product_id]" class="form-control service-prod-select" onchange="updateServiceItemPrice(0, this); calcServiceReminderDate();" required>
                                         <option value="">اختر الصنف / الشمعة / الخدمة...</option>
                                         @foreach($products as $p)
@@ -5973,29 +5997,53 @@
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>سعر الوحدة:</label>
+                                    <label style="font-size: 11.5px; font-weight: 700;">سعر الوحدة:</label>
                                     <input type="number" step="0.01" name="items[0][unit_price]" id="serviceUnitPrice_0" class="form-control num" placeholder="0.00" oninput="calculateServiceTotals()" required>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>الكمية:</label>
+                                    <label style="font-size: 11.5px; font-weight: 700;">العدد / الكمية:</label>
                                     <input type="number" name="items[0][quantity]" id="serviceQty_0" class="form-control num" value="1" min="1" oninput="calculateServiceTotals()" required>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label>الضريبة (15%):</label>
-                                    <input type="number" step="0.01" name="items[0][tax]" id="serviceTax_0" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;">
+                                    <label style="font-size: 11.5px; font-weight: 700; color: #475569;">الإجمالي:</label>
+                                    <input type="text" id="serviceLineSub_0" class="form-control num" value="0.00" readonly style="background: #f8fafc; font-weight: 700; color: #334155;" title="الإجمالي قبل الضريبة">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 11.5px; font-weight: 700; color: #059669;">الضريبة (15%):</label>
+                                    <input type="number" step="0.01" name="items[0][tax]" id="serviceTax_0" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #059669; font-weight: 700;" title="ضريبة القيمة المضافة 15%">
                                     <input type="hidden" name="items[0][discount]" value="0.00">
                                 </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 11.5px; font-weight: 700; color: #0284c7;">المجموع:</label>
+                                    <input type="text" id="serviceLineTotal_0" class="form-control num" value="0.00" readonly style="background: rgba(2,132,199,0.08); color: #0284c7; font-weight: 800;" title="المجموع شامل الضريبة">
+                                </div>
                                 <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removeServiceItemRow(0)">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- شريط عدادات وملخص إجمالي الأصناف والخدمات -->
+                    <div id="serviceItemsCountersBar" style="background: #f0f9ff; border: 1.5px dashed #7dd3fc; border-radius: 8px; padding: 0.65rem 1rem; margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                        <div style="font-size: 12px; font-weight: 800; color: #0369a1; display: flex; align-items: center; gap: 6px;">
+                            <span>📊 عدادات الخدمات والقطع والإجمالي:</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 12px;">
+                            <div>إجمالي العدد: <b id="serviceTotalQtyCounter" class="num" style="color: #0f172a; font-size: 13.5px; font-weight: 800;">1</b> قطعة</div>
+                            <div>الإجمالي قبل الضريبة: <b id="serviceTotalSubCounter" class="num" style="color: #0f172a; font-size: 13.5px; font-weight: 800;">0.00</b> ر.س</div>
+                            <div>الضريبة (15%): <b id="serviceTotalTaxCounter" class="num" style="color: #059669; font-size: 13.5px; font-weight: 800;">0.00</b> ر.س</div>
+                            <div style="background: #0284c7; color: #fff; padding: 3px 12px; border-radius: 6px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>المجموع الكلي:</span>
+                                <span id="serviceTotalGrandCounter" class="num" style="font-size: 14px;">0.00 ر.س</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- طريقة السداد والمبلغ والملاحظات -->
-                <div class="form-row-3" style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 10px; margin-bottom: 1.25rem;">
+                <div class="form-row-3" style="background: #334155; padding: 1rem 1.25rem; border-radius: 10px; margin-bottom: 1.25rem; border: 1px solid #475569;">
                     <div class="form-group">
-                        <label>طريقة السداد:</label>
-                        <select name="payment_method" class="form-control" required>
+                        <label style="color: #ffffff; font-weight: 700; font-size: 13px;">طريقة السداد: <span style="color: #38bdf8;">*</span></label>
+                        <select name="payment_method" class="form-control" required style="border-color: #64748b;">
                             <option value="mada_pos">شبكة مدى (Mada POS)</option>
                             <option value="cash">نقداً (Cash)</option>
                             <option value="bank_transfer">تحويل بنكي</option>
@@ -6005,13 +6053,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label>المبلغ المدفوع الآن:</label>
-                        <input type="number" step="0.01" name="paid_amount" id="servicePaidAmount" class="form-control num" value="0.00">
+                        <label style="color: #ffffff; font-weight: 700; font-size: 13px;">المبلغ المدفوع الآن: <span style="color: #38bdf8;">*</span></label>
+                        <input type="number" step="0.01" name="paid_amount" id="servicePaidAmount" class="form-control num" value="0.00" style="border-color: #64748b; font-weight: 700;">
                     </div>
 
                     <div class="form-group">
-                        <label>تقرير الصيانة وملاحظات الفني:</label>
-                        <input type="text" name="notes" id="serviceNotesInput" class="form-control" placeholder="مثال: تم تغيير شمعات 1 و 2 و 3 وفحص ضغط المياه ونسبة الأملاح 120 TDS">
+                        <label style="color: #ffffff; font-weight: 700; font-size: 13px;">تقرير الصيانة وملاحظات الفني:</label>
+                        <input type="text" name="notes" id="serviceNotesInput" class="form-control" placeholder="مثال: تم تغيير شمعات 1 و 2 و 3 وفحص ضغط المياه ونسبة الأملاح 120 TDS" style="border-color: #64748b;">
                     </div>
                 </div>
 
@@ -7811,7 +7859,10 @@
         }
 
         // Modal Controls
-        function openNewSaleModal() { openModal('newSaleModal'); }
+        function openNewSaleModal() { 
+            openModal('newSaleModal'); 
+            calculatePosTotals();
+        }
         function openNewServiceInvoiceModal() { 
             openModal('newServiceInvoiceModal'); 
             calculateServiceTotals();
@@ -8084,31 +8135,40 @@
 
             const rowHtml = `
                 <div class="pos-item-box" id="serviceRow_${idx}">
-                    <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                    <div class="form-row" style="grid-template-columns: 2.2fr 1fr 0.8fr 1fr 1fr 1.1fr auto; align-items: flex-end; gap: 0.5rem;">
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>البند / القطعة / الخدمة:</label>
+                            <label style="font-size: 11.5px; font-weight: 700;">البند / القطعة / الخدمة:</label>
                             <select name="items[${idx}][product_id]" class="form-control service-prod-select" onchange="updateServiceItemPrice(${idx}, this); calcServiceReminderDate();" required>
                                 ${optionsHtml}
                             </select>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>سعر الوحدة:</label>
+                            <label style="font-size: 11.5px; font-weight: 700;">سعر الوحدة:</label>
                             <input type="number" step="0.01" name="items[${idx}][unit_price]" id="serviceUnitPrice_${idx}" class="form-control num" placeholder="0.00" oninput="calculateServiceTotals()" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>الكمية:</label>
+                            <label style="font-size: 11.5px; font-weight: 700;">العدد / الكمية:</label>
                             <input type="number" name="items[${idx}][quantity]" id="serviceQty_${idx}" class="form-control num" value="1" min="1" oninput="calculateServiceTotals()" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>الضريبة (15%):</label>
-                            <input type="number" step="0.01" name="items[${idx}][tax]" id="serviceTax_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;">
+                            <label style="font-size: 11.5px; font-weight: 700; color: #475569;">الإجمالي:</label>
+                            <input type="text" id="serviceLineSub_${idx}" class="form-control num" value="0.00" readonly style="background: #f8fafc; font-weight: 700; color: #334155;" title="الإجمالي قبل الضريبة">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11.5px; font-weight: 700; color: #059669;">الضريبة (15%):</label>
+                            <input type="number" step="0.01" name="items[${idx}][tax]" id="serviceTax_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #059669; font-weight: 700;" title="ضريبة القيمة المضافة 15%">
                             <input type="hidden" name="items[${idx}][discount]" value="0.00">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11.5px; font-weight: 700; color: #0284c7;">المجموع:</label>
+                            <input type="text" id="serviceLineTotal_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(2,132,199,0.08); color: #0284c7; font-weight: 800;" title="المجموع شامل الضريبة">
                         </div>
                         <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removeServiceItemRow(${idx})">&times;</button>
                     </div>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', rowHtml);
+            calculateServiceTotals();
         }
 
         function removeServiceItemRow(idx) {
@@ -8130,18 +8190,26 @@
         function calculateServiceTotals() {
             let subtotal = 0;
             let totalTax = 0;
+            let totalQty = 0;
 
             document.querySelectorAll('#serviceItemsContainer .pos-item-box').forEach(box => {
                 const priceInput = box.querySelector('input[name*="[unit_price]"]');
                 const qtyInput   = box.querySelector('input[name*="[quantity]"]');
                 const taxInput   = box.querySelector('input[id^="serviceTax_"]');
+                const subInput   = box.querySelector('input[id^="serviceLineSub_"]');
+                const totalInput = box.querySelector('input[id^="serviceLineTotal_"]');
 
                 const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
                 const qty   = parseInt(qtyInput ? qtyInput.value : 1) || 1;
                 const lineSub = price * qty;
                 const lineTax = lineSub * 0.15;
+                const lineTotal = lineSub + lineTax;
 
-                if (taxInput) taxInput.value = lineTax.toFixed(2);
+                if (taxInput)   taxInput.value = lineTax.toFixed(2);
+                if (subInput)   subInput.value = lineSub.toFixed(2);
+                if (totalInput) totalInput.value = lineTotal.toFixed(2);
+
+                totalQty += qty;
                 subtotal += lineSub;
                 totalTax += lineTax;
             });
@@ -8154,6 +8222,16 @@
             if (subDisp) subDisp.innerText = subtotal.toFixed(2);
             if (taxDisp) taxDisp.innerText = totalTax.toFixed(2);
             if (grandDisp) grandDisp.innerText = grandTotal.toFixed(2) + ' ر.س';
+
+            // عدادات ملخص البنود
+            const qtyCounter = document.getElementById('serviceTotalQtyCounter');
+            const subCounter = document.getElementById('serviceTotalSubCounter');
+            const taxCounter = document.getElementById('serviceTotalTaxCounter');
+            const grandCounter = document.getElementById('serviceTotalGrandCounter');
+            if (qtyCounter) qtyCounter.innerText = totalQty;
+            if (subCounter) subCounter.innerText = subtotal.toFixed(2);
+            if (taxCounter) taxCounter.innerText = totalTax.toFixed(2);
+            if (grandCounter) grandCounter.innerText = grandTotal.toFixed(2) + ' ر.س';
 
             // Update Live QR Code & Barcode under service totals
             const qrImg = document.getElementById('serviceLiveQrImg');
@@ -9178,31 +9256,40 @@
 
             const rowHtml = `
                 <div class="pos-item-box" id="posRow_${idx}">
-                    <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1fr auto; align-items: flex-end;">
+                    <div class="form-row" style="grid-template-columns: 2.2fr 1fr 0.8fr 1fr 1fr 1.1fr auto; align-items: flex-end; gap: 0.5rem;">
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>الصنف:</label>
+                            <label style="font-size: 11.5px; font-weight: 700;">الصنف:</label>
                             <select name="items[${idx}][product_id]" class="form-control pos-prod-select" onchange="updatePosItemPrice(${idx}, this); calcPosReminderDate();" required>
                                 ${optionsHtml}
                             </select>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>سعر الوحدة:</label>
+                            <label style="font-size: 11.5px; font-weight: 700;">سعر الوحدة:</label>
                             <input type="number" step="0.01" name="items[${idx}][unit_price]" id="posUnitPrice_${idx}" class="form-control num" placeholder="0.00" oninput="calculatePosTotals()" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>الكمية:</label>
+                            <label style="font-size: 11.5px; font-weight: 700;">العدد / الكمية:</label>
                             <input type="number" name="items[${idx}][quantity]" id="posQty_${idx}" class="form-control num" value="1" min="1" oninput="calculatePosTotals()" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label>الضريبة (15%):</label>
-                            <input type="number" step="0.01" name="items[${idx}][tax]" id="posTax_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #10b981; font-weight: 700;" title="ضريبة القيمة المضافة 15% تحسب تلقائياً">
+                            <label style="font-size: 11.5px; font-weight: 700; color: #475569;">الإجمالي:</label>
+                            <input type="text" id="posLineSub_${idx}" class="form-control num" value="0.00" readonly style="background: #f8fafc; font-weight: 700; color: #334155;" title="الإجمالي قبل الضريبة">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11.5px; font-weight: 700; color: #059669;">الضريبة (15%):</label>
+                            <input type="number" step="0.01" name="items[${idx}][tax]" id="posTax_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(16,185,129,0.08); color: #059669; font-weight: 700;" title="ضريبة القيمة المضافة 15% تحسب تلقائياً">
                             <input type="hidden" name="items[${idx}][discount]" value="0.00">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 11.5px; font-weight: 700; color: #0284c7;">المجموع:</label>
+                            <input type="text" id="posLineTotal_${idx}" class="form-control num" value="0.00" readonly style="background: rgba(2,132,199,0.08); color: #0284c7; font-weight: 800;" title="المجموع شامل الضريبة">
                         </div>
                         <button type="button" class="close-btn" style="color: #fb7185; padding-bottom: 8px;" onclick="removePosItemRow(${idx})">&times;</button>
                     </div>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', rowHtml);
+            calculatePosTotals();
         }
 
         function removePosItemRow(idx) {
@@ -9224,21 +9311,26 @@
         function calculatePosTotals() {
             let subtotal = 0;
             let totalTax = 0;
+            let totalQty = 0;
 
             document.querySelectorAll('#posItemsContainer .pos-item-box').forEach(box => {
                 const priceInput = box.querySelector('input[name*="[unit_price]"]');
                 const qtyInput   = box.querySelector('input[name*="[quantity]"]');
                 const taxInput   = box.querySelector('input[id^="posTax_"]');
+                const subInput   = box.querySelector('input[id^="posLineSub_"]');
+                const totalInput = box.querySelector('input[id^="posLineTotal_"]');
 
                 const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
                 const qty   = parseInt(qtyInput ? qtyInput.value : 1) || 1;
                 const lineSub = price * qty;
                 const lineTax = lineSub * 0.15;
+                const lineTotal = lineSub + lineTax;
 
-                if (taxInput) {
-                    taxInput.value = lineTax.toFixed(2);
-                }
+                if (taxInput)   taxInput.value = lineTax.toFixed(2);
+                if (subInput)   subInput.value = lineSub.toFixed(2);
+                if (totalInput) totalInput.value = lineTotal.toFixed(2);
 
+                totalQty += qty;
                 subtotal += lineSub;
                 totalTax += lineTax;
             });
@@ -9249,19 +9341,29 @@
             document.getElementById('posTaxDisp').innerText = totalTax.toFixed(2);
             document.getElementById('posGrandTotalDisp').innerText = grandTotal.toFixed(2) + ' ر.س';
 
+            // عدادات ملخص البنود
+            const qtyCounter = document.getElementById('posTotalQtyCounter');
+            const subCounter = document.getElementById('posTotalSubCounter');
+            const taxCounter = document.getElementById('posTotalTaxCounter');
+            const grandCounter = document.getElementById('posTotalGrandCounter');
+            if (qtyCounter) qtyCounter.innerText = totalQty;
+            if (subCounter) subCounter.innerText = subtotal.toFixed(2);
+            if (taxCounter) taxCounter.innerText = totalTax.toFixed(2);
+            if (grandCounter) grandCounter.innerText = grandTotal.toFixed(2) + ' ر.س';
+
             // Update Live QR Code & Barcode under totals
             const qrImg = document.getElementById('posLiveQrImg');
             const summaryText = document.getElementById('posBarcodeSummaryText');
             const linearBarcode = document.getElementById('posLiveLinearBarcode');
 
             const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
-            const qrPayload = encodeURIComponent(`Seller: FilterTech Co.\nVAT: 310999888700003\nDate: ${nowStr}\nSubtotal: ${netSubtotal.toFixed(2)} SAR\nVAT (15%): ${vat.toFixed(2)} SAR\nTotal: ${grandTotal.toFixed(2)} SAR`);
+            const qrPayload = encodeURIComponent(`Seller: FilterTech Co.\nVAT: 310999888700003\nDate: ${nowStr}\nSubtotal: ${subtotal.toFixed(2)} SAR\nVAT (15%): ${totalTax.toFixed(2)} SAR\nTotal: ${grandTotal.toFixed(2)} SAR`);
 
             if (qrImg) {
                 qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${qrPayload}`;
             }
             if (summaryText) {
-                summaryText.innerText = `الضريبة: ${vat.toFixed(2)} ر.س | الإجمالي المطلوب: ${grandTotal.toFixed(2)} ر.س`;
+                summaryText.innerText = `الضريبة: ${totalTax.toFixed(2)} ر.س | الإجمالي المطلوب: ${grandTotal.toFixed(2)} ر.س`;
             }
             if (linearBarcode) {
                 const totalClean = grandTotal.toFixed(2).replace('.', '');
