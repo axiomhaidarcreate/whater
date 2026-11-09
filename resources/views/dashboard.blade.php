@@ -6321,7 +6321,7 @@
                     </div>
                 </div>
 
-                <div class="form-row-3">
+                <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1.2fr; gap: 0.75rem;">
                     <div class="form-group">
                         <label>سعر التكلفة الافتراضي (ر.س):</label>
                         <input type="number" step="0.01" name="cost_price" class="form-control num" value="0.00" min="0">
@@ -6335,6 +6335,11 @@
                     <div class="form-group">
                         <label>حد إعادة الطلب بالمخزن:</label>
                         <input type="number" name="reorder_level" class="form-control num" value="5" min="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-weight: 700; color: #10b981;">الرصيد الافتتاحي المتوفر بالمستودع:</label>
+                        <input type="number" name="initial_stock" class="form-control num" value="100" min="0" placeholder="100" style="border-color: #10b981; font-weight: 700;" title="الكمية الأولية التي تضاف فوراً لرصيد المستودع ليكون الصنف جاهزاً للبيع مباشرة">
                     </div>
                 </div>
 

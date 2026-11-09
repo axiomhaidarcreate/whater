@@ -552,16 +552,22 @@ class DashboardController extends Controller
                 ];
             }
 
-            $invoice = $this->salesService->issueInvoice(
-                customer: $customer,
-                warehouse: $warehouse,
-                items: $validated['items'],
-                invoiceDate: $validated['order_date'],
-                address: $address,
-                salesOrder: null,
-                initialPayment: $initialPayment,
-                user: Auth::user()
-            );
+            try {
+                $invoice = $this->salesService->issueInvoice(
+                    customer: $customer,
+                    warehouse: $warehouse,
+                    items: $validated['items'],
+                    invoiceDate: $validated['order_date'],
+                    address: $address,
+                    salesOrder: null,
+                    initialPayment: $initialPayment,
+                    user: Auth::user()
+                );
+            } catch (\App\Exceptions\InsufficientStockException $e) {
+                return $this->redirectBackWithTab($request, null, $e->getMessage());
+            } catch (\Throwable $e) {
+                return $this->redirectBackWithTab($request, null, 'تعذر إصدار الفاتورة: ' . $e->getMessage());
+            }
 
             // حفظ موعد تذكير العميل وإرساله تلقائياً لخدمة العملاء
             $reminderDate = $validated['reminder_date'] ?? null;
@@ -2454,6 +2460,7 @@ class DashboardController extends Controller
             'cost_price'          => 'nullable|numeric|min:0',
             'selling_price'       => 'nullable|numeric|min:0',
             'reorder_level'       => 'nullable|integer|min:0',
+            'initial_stock'       => 'nullable|integer|min:0',
             'description'         => 'nullable|string',
             'is_active'           => 'nullable|boolean',
             'filter_life_months'  => 'nullable|integer|min:0|max:120',
@@ -2476,6 +2483,18 @@ class DashboardController extends Controller
         $validated['reminder_type']       = $validated['reminder_type'] ?? 'months';
 
         $product = Product::create($validated);
+
+        // تهيئة الرصيد الافتتاحي بالمستودع للمنتجات المادية لتفادي خطأ نفاد المخزون
+        if ($product->type !== 'service') {
+            $initialQty = $request->filled('initial_stock') ? (int)$request->input('initial_stock') : 100;
+            $warehouses = Warehouse::all();
+            foreach ($warehouses as $w) {
+                StockBalance::firstOrCreate(
+                    ['warehouse_id' => $w->id, 'product_id' => $product->id],
+                    ['quantity' => $initialQty, 'reserved_quantity' => 0]
+                );
+            }
+        }
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
