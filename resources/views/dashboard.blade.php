@@ -1814,14 +1814,39 @@
                         </h2>
                         <div>
                             @forelse($interactions->take(5) as $interaction)
-                            <div style="padding: 0.75rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
-                                <div>
-                                    <div style="font-weight: 700; font-size: 0.85rem;">{{ $interaction->customer?->name ?? 'عميل غير مسجل' }}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-dim);">{{ Str::limit($interaction->notes ?? 'متابعة هاتفية دورية واستحقاقات فلاتر', 40) }}</div>
+                            <div style="padding: 0.85rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                        <span>{{ $interaction->customer?->name ?? 'عميل غير مسجل' }}</span>
+                                        @if($interaction->customer?->primary_phone)
+                                        <a href="tel:{{ $interaction->customer->primary_phone }}" style="font-size: 0.75rem; color: #10b981; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;" class="num" title="اتصال مباشر بالعميل">
+                                            📞 {{ $interaction->customer->primary_phone }}
+                                        </a>
+                                        @endif
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 3px; line-height: 1.4;">
+                                        {{ Str::limit($interaction->notes ?? 'متابعة هاتفية دورية واستحقاقات فلاتر', 80) }}
+                                    </div>
+                                    @if($interaction->follow_up_date)
+                                    <div style="font-size: 0.72rem; margin-top: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                        <span style="color: #38bdf8; font-weight: 700;">⏱️ موعد التذكير الدقيق:</span>
+                                        <span class="num" style="font-weight: 700; color: #f59e0b;">{{ \Carbon\Carbon::parse($interaction->follow_up_date)->format('Y-m-d') }}</span>
+                                        @php
+                                            $diff = (int)\Carbon\Carbon::today()->diffInDays(\Carbon\Carbon::parse($interaction->follow_up_date), false);
+                                        @endphp
+                                        @if($diff < 0)
+                                            <span class="badge badge-overdue" style="font-size: 0.68rem; padding: 2px 7px;">متأخر {{ abs($diff) }} يوم</span>
+                                        @elseif($diff == 0)
+                                            <span class="badge badge-due-today" style="font-size: 0.68rem; padding: 2px 7px;">🔔 مستحق اليوم</span>
+                                        @else
+                                            <span class="badge badge-upcoming" style="font-size: 0.68rem; padding: 2px 7px;">متبقي {{ $diff }} يوم</span>
+                                        @endif
+                                    </div>
+                                    @endif
                                 </div>
-                                <div style="text-align: left;">
-                                    <span class="badge badge-active" style="font-size: 0.7rem;">{{ $interaction->interaction_type ?? 'اتصال' }}</span>
-                                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;" class="num">{{ $interaction->created_at?->format('Y-m-d') }}</div>
+                                <div style="text-align: left; flex-shrink: 0;">
+                                    <span class="badge badge-active" style="font-size: 0.7rem;">{{ $interaction->channel === 'system_reminder' ? 'تذكير صيانة' : ($interaction->channel ?? 'اتصال') }}</span>
+                                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.3rem;" class="num">{{ $interaction->created_at?->format('Y-m-d') }}</div>
                                 </div>
                             </div>
                             @empty
@@ -2560,7 +2585,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                                             <a href="{{ route('invoices.print', $inv->id) }}" target="_blank" class="btn btn-outline" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; color: #38bdf8;" title="طباعة الفاتورة كـ PDF">
                                                 🖨️ طباعة PDF
                                             </a>
@@ -2568,6 +2593,17 @@
                                             <button class="btn btn-success" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="openPaymentModal({{ $inv->id }}, '{{ $inv->invoice_number }}', {{ $inv->balance_due }})">
                                                 💵 تحصيل دفعة
                                             </button>
+                                            @endif
+                                            @if($isAdmin || $isSuperAdmin || $isGeneralMgr || (auth()->user() && auth()->user()->hasRole('admin')))
+                                            <button type="button" class="btn btn-outline" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; color: #0284c7; border-color: #38bdf8;" onclick="openEditInvoiceModal({{ $inv->id }}, '{{ $inv->invoice_number }}', '{{ addslashes($inv->customer?->name ?? 'عميل نقدي') }}', '{{ $inv->invoice_date ? $inv->invoice_date->format('Y-m-d') : date('Y-m-d') }}', '{{ $inv->status }}', {{ (float)$inv->grand_total }}, {{ (float)$inv->paid_amount }}, {{ (float)$inv->balance_due }}, '{{ addslashes($inv->reminder_notes ?? '') }}')" title="تعديل بيانات الفاتورة (صلاحية المدير)">
+                                                ✏️ تعديل
+                                            </button>
+                                            <form action="{{ route('sales.invoices.delete', $inv->id) }}" method="POST" style="display: inline; margin: 0;" onsubmit="return confirm('تأكيد: هل أنت متأكد من حذف وإلغاء الفاتورة رقم ({{ $inv->invoice_number }})؟\nسيتم استرجاع الكميات المخصومة إلى المستودع فوراً.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline" style="padding: 0.3rem 0.55rem; font-size: 0.75rem; color: #ef4444; border-color: #fca5a5;" title="حذف وإلغاء الفاتورة واستعادة المخزون (صلاحية المدير)">
+                                                    🗑️ حذف
+                                                </button>
+                                            </form>
                                             @endif
                                         </div>
                                     </td>
@@ -4973,9 +5009,22 @@
                                     <td class="num" style="color: {{ $inv->balance_due > 0 ? '#fb7185' : 'inherit' }};">{{ number_format($inv->balance_due, 2) }} ر.س</td>
                                     <td><span class="badge badge-active">{{ $inv->status }}</span></td>
                                     <td>
-                                        <a href="{{ route('invoices.print', $inv->id) }}" target="_blank" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                                            🖨️ PDF
-                                        </a>
+                                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                                            <a href="{{ route('invoices.print', $inv->id) }}" target="_blank" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                                                🖨️ PDF
+                                            </a>
+                                            @if($isAdmin || $isSuperAdmin || $isGeneralMgr || (auth()->user() && auth()->user()->hasRole('admin')))
+                                            <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; color: #0284c7; border-color: #38bdf8;" onclick="openEditInvoiceModal({{ $inv->id }}, '{{ $inv->invoice_number }}', '{{ addslashes($inv->customer?->name ?? 'عميل نقدي') }}', '{{ $inv->invoice_date ? $inv->invoice_date->format('Y-m-d') : date('Y-m-d') }}', '{{ $inv->status }}', {{ (float)$inv->grand_total }}, {{ (float)$inv->paid_amount }}, {{ (float)$inv->balance_due }}, '{{ addslashes($inv->reminder_notes ?? '') }}')" title="تعديل الفاتورة">
+                                                ✏️
+                                            </button>
+                                            <form action="{{ route('sales.invoices.delete', $inv->id) }}" method="POST" style="display: inline; margin: 0;" onsubmit="return confirm('تأكيد: هل أنت متأكد من حذف وإلغاء الفاتورة رقم ({{ $inv->invoice_number }})؟\nسيتم استرجاع الكميات المخصومة إلى المستودع فوراً.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; color: #ef4444; border-color: #fca5a5;" title="حذف الفاتورة واستعادة المخزون">
+                                                    🗑️
+                                                </button>
+                                            </form>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -6184,6 +6233,74 @@
         </div>
     </div>
 
+    <!-- MODAL: Edit Invoice (تعديل بيانات الفاتورة - صلاحية المدير) -->
+    <div id="editInvoiceModal" class="modal">
+        <div class="modal-content" style="max-width: 580px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(2,132,199,0.1), rgba(16,185,129,0.05)); padding: 1.1rem 1.4rem; border-bottom: 2px solid #0284c7;">
+                <h3 style="font-weight: 800; color: #0284c7; display: flex; align-items: center; gap: 0.6rem; margin: 0; font-size: 1.1rem;">
+                    <span>✏️</span>
+                    <span>تعديل بيانات الفاتورة <span id="editInvoiceNumberHeader" style="color: #0f172a; font-family: monospace;"></span></span>
+                </h3>
+                <button class="close-btn" onclick="closeModal('editInvoiceModal')">&times;</button>
+            </div>
+
+            <form id="editInvoiceForm" action="" method="POST" style="padding: 1.25rem;">
+                @csrf
+                <input type="hidden" name="_active_tab" value="sales">
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 700;">العميل:</label>
+                    <input type="text" id="editInvoiceCustomerName" class="form-control" readonly style="background: #f1f5f9; font-weight: 700;">
+                </div>
+
+                <div class="form-row" style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 700;">تاريخ الفاتورة:</label>
+                        <input type="date" name="invoice_date" id="editInvoiceDate" class="form-control" required style="font-weight: 700;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 700;">حالة الفاتورة:</label>
+                        <select name="status" id="editInvoiceStatus" class="form-control" required style="font-weight: 700;">
+                            <option value="paid">مدفوعة بالكامل (paid)</option>
+                            <option value="partially_paid">مدفوعة جزئياً (partially_paid)</option>
+                            <option value="unpaid">معلقة / آجل (unpaid)</option>
+                            <option value="pending">قيد المعالجة (pending)</option>
+                            <option value="cancelled">ملغاة (cancelled)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 700;">الإجمالي الكلي النهائي:</label>
+                        <input type="text" id="editInvoiceGrandTotal" class="form-control num" readonly style="background: #f1f5f9; font-weight: 800; color: #0f172a;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 700;">المبلغ المدفوع (ر.س):</label>
+                        <input type="number" step="0.01" min="0" name="paid_amount" id="editInvoicePaidAmount" class="form-control num" style="font-weight: 700; color: #10b981;" oninput="recalcEditInvoiceBalance()">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label style="font-weight: 700;">المتبقي المستحق (يحسب تلقائياً):</label>
+                    <input type="text" id="editInvoiceBalanceDue" class="form-control num" readonly style="background: #fef2f2; font-weight: 800; color: #ef4444;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="font-weight: 700;">ملاحظات / توجيهات الفاتورة:</label>
+                    <textarea name="reminder_notes" id="editInvoiceNotes" class="form-control" rows="2" placeholder="ملاحظات اختيارية..."></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editInvoiceModal')">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700; padding: 0.55rem 1.6rem;">
+                        💾 حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL 3: Add Supplier (إضافة مورد جديد) -->
     <div id="newSupplierModal" class="modal">
         <div class="modal-content">
@@ -6253,6 +6370,7 @@
 
             <form action="{{ route('products.create') }}" method="POST">
                 @csrf
+                <input type="hidden" name="_active_tab" value="products">
                 <div class="form-row">
                     <div class="form-group">
                         <label>اسم الصنف بالعربية: <span style="color:#ef4444">*</span></label>
@@ -6390,6 +6508,7 @@
 
             <form id="editProductForm" action="" method="POST">
                 @csrf
+                <input type="hidden" name="_active_tab" value="products">
                 <div class="form-row">
                     <div class="form-group">
                         <label>اسم الصنف بالعربية: <span style="color:#ef4444">*</span></label>
@@ -8506,6 +8625,34 @@
             document.getElementById('payAmountInput').max = parseFloat(balanceDue).toFixed(2);
             document.getElementById('recordPaymentForm').action = '/sales/invoices/' + invoiceId + '/payment';
             document.getElementById('recordPaymentModal').classList.add('active');
+        }
+
+        function openEditInvoiceModal(id, invoiceNumber, customerName, invoiceDate, status, grandTotal, paidAmount, balanceDue, notes) {
+            document.getElementById('editInvoiceNumberHeader').innerText = '#' + invoiceNumber;
+            document.getElementById('editInvoiceCustomerName').value = customerName;
+            document.getElementById('editInvoiceDate').value = invoiceDate;
+            document.getElementById('editInvoiceStatus').value = status;
+            document.getElementById('editInvoiceGrandTotal').value = parseFloat(grandTotal).toFixed(2);
+            document.getElementById('editInvoicePaidAmount').value = parseFloat(paidAmount).toFixed(2);
+            document.getElementById('editInvoiceBalanceDue').value = parseFloat(balanceDue).toFixed(2) + ' ر.س';
+            document.getElementById('editInvoiceNotes').value = notes || '';
+            document.getElementById('editInvoiceForm').action = '/sales/invoices/' + id + '/update';
+            openModal('editInvoiceModal');
+        }
+
+        function recalcEditInvoiceBalance() {
+            const grand = parseFloat(document.getElementById('editInvoiceGrandTotal').value) || 0;
+            const paid = parseFloat(document.getElementById('editInvoicePaidAmount').value) || 0;
+            const bal = Math.max(0, grand - paid);
+            document.getElementById('editInvoiceBalanceDue').value = bal.toFixed(2) + ' ر.س';
+            const statusSel = document.getElementById('editInvoiceStatus');
+            if (bal <= 0.001) {
+                statusSel.value = 'paid';
+            } else if (paid > 0) {
+                statusSel.value = 'partially_paid';
+            } else {
+                statusSel.value = 'unpaid';
+            }
         }
 
         function openAssignModal(ticketId, ticketNumber) {

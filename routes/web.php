@@ -46,6 +46,8 @@ Route::get('/lifecycle/print', [DashboardController::class, 'printLifecycle'])->
 // شاشة المبيعات ونقاط البيع (ERP Sales & Invoicing)
 Route::post('/sales/create', [DashboardController::class, 'createSale'])->name('sales.create');
 Route::post('/sales/invoices/{invoice}/payment', [DashboardController::class, 'recordPayment'])->name('sales.invoices.payment');
+Route::post('/sales/invoices/{invoice}/update', [DashboardController::class, 'updateInvoice'])->name('sales.invoices.update');
+Route::post('/sales/invoices/{invoice}/delete', [DashboardController::class, 'deleteInvoice'])->name('sales.invoices.delete');
 
 // شاشة الموردين وإدارة المشتريات (Suppliers & Procurement)
 Route::post('/suppliers/create', [DashboardController::class, 'createSupplier'])->name('suppliers.create');

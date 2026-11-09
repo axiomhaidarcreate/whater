@@ -637,6 +637,15 @@ class DashboardController extends Controller
                         $stageNum = $maxStage + 1;
                         $intervalDays = ($lifeMonths > 0 ? $lifeMonths * 30 : 180);
 
+                        $dueDateObj = Carbon::parse($itemDueDate)->startOfDay();
+                        $today = Carbon::today();
+                        $stageStatus = 'upcoming';
+                        if ($dueDateObj->lt($today)) {
+                            $stageStatus = 'overdue';
+                        } elseif ($dueDateObj->eq($today)) {
+                            $stageStatus = 'due_today';
+                        }
+
                         CustomerDeviceStage::create([
                             'customer_device_id'         => $device->id,
                             'stage_number'               => $stageNum,
@@ -646,7 +655,7 @@ class DashboardController extends Controller
                             'service_interval_months'    => $lifeMonths ?: 6,
                             'last_actual_replacement_at' => $invoice->invoice_date,
                             'next_due_at'                => $itemDueDate,
-                            'status'                     => 'upcoming',
+                            'status'                     => $stageStatus,
                             'technician_notes'           => 'مبيعات مباشرة - فاتورة #' . $invoice->invoice_number . ($soldProd->filter_life_note ? ' (' . $soldProd->filter_life_note . ')' : ''),
                         ]);
 
@@ -678,8 +687,8 @@ class DashboardController extends Controller
                     'customer_id'        => $customer->id,
                     'customer_device_id' => $device?->id,
                     'agent_id'           => Auth::id() ?? 1,
-                    'channel'            => 'system_generated',
-                    'outcome'            => 'agreed_scheduled',
+                    'channel'            => 'system_reminder',
+                    'outcome'            => 'pending_follow_up',
                     'follow_up_date'     => $reminderDate,
                     'notes'              => '🔔 تذكير استحقاق صيانة لخدمة العملاء: موعد صيانة وتغيير فلتر (' . $prodNamesText . ') للعميل (' . $customer->name . ' - ' . $customer->primary_phone . ') بموجب الفاتورة رقم (' . $invoice->invoice_number . '). موعد الاتصال بالعميل: ' . $reminderDate . ($reminderNotes ? ' - ' . $reminderNotes : ''),
                 ]);
@@ -748,6 +757,102 @@ class DashboardController extends Controller
         );
 
         return redirect()->back()->with('success', "تم تسجيل سند القبض المالي بمبلغ {$validated['amount']} ر.س للفاتورة {$invoice->invoice_number}");
+    }
+
+    /**
+     * تحديث بيانات فاتورة مبيعات (صلاحية المدير حصراً)
+     */
+    public function updateInvoice(Request $request, Invoice $invoice)
+    {
+        $user = Auth::user();
+        $isManagerOrAdmin = $user && ($user->hasRole('super_admin') || $user->hasRole('system_admin') || $user->hasRole('admin') || $user->hasRole('general_manager') || $user->hasRole('sales_manager') || $user->id === 1);
+        if (!$isManagerOrAdmin) {
+            return redirect()->route('dashboard', ['tab' => 'sales'])->with('error', 'عذراً، تعديل الفواتير متاح حصراً للمدير.');
+        }
+
+        $validated = $request->validate([
+            'invoice_date'   => 'required|date',
+            'status'         => 'required|in:paid,partially_paid,unpaid,pending,cancelled',
+            'paid_amount'    => 'nullable|numeric|min:0',
+            'reminder_notes' => 'nullable|string|max:500',
+        ]);
+
+        $grandTotal = (float)$invoice->grand_total;
+        $paidAmount = isset($validated['paid_amount']) ? (float)$validated['paid_amount'] : (float)$invoice->paid_amount;
+        $balanceDue = max(0, round($grandTotal - $paidAmount, 2));
+
+        $invoice->update([
+            'invoice_date'   => $validated['invoice_date'],
+            'status'         => $validated['status'],
+            'paid_amount'    => $paidAmount,
+            'balance_due'    => $balanceDue,
+            'reminder_notes' => $validated['reminder_notes'] ?? $invoice->reminder_notes,
+        ]);
+
+        AuditLog::create([
+            'user_id'        => $user->id ?? 1,
+            'action'         => 'invoice.updated',
+            'auditable_type' => Invoice::class,
+            'auditable_id'   => $invoice->id,
+            'ip_address'     => $request->ip(),
+            'user_agent'     => $request->userAgent(),
+            'new_values'     => $validated,
+            'created_at'     => now(),
+        ]);
+
+        return redirect()->route('dashboard', ['tab' => 'sales'])->with('success', "تم تحديث بيانات الفاتورة ({$invoice->invoice_number}) بنجاح.");
+    }
+
+    /**
+     * حذف وإلغاء فاتورة مبيعات مع استرجاع المخزون (صلاحية المدير حصراً)
+     */
+    public function deleteInvoice(Request $request, Invoice $invoice)
+    {
+        $user = Auth::user();
+        $isManagerOrAdmin = $user && ($user->hasRole('super_admin') || $user->hasRole('system_admin') || $user->hasRole('admin') || $user->hasRole('general_manager') || $user->id === 1);
+        if (!$isManagerOrAdmin) {
+            return redirect()->route('dashboard', ['tab' => 'sales'])->with('error', 'عذراً، حذف وإلغاء الفواتير متاح حصراً للمدير.');
+        }
+
+        $invNum = $invoice->invoice_number;
+
+        DB::transaction(function () use ($invoice, $user, $invNum) {
+            // 1. إعادة الكميات المخصومة إلى المستودع
+            if ($invoice->warehouse_id) {
+                foreach ($invoice->items as $item) {
+                    $prod = $item->product;
+                    if ($prod && $prod->type !== 'service') {
+                        $sb = StockBalance::where('warehouse_id', $invoice->warehouse_id)
+                            ->where('product_id', $prod->id)
+                            ->first();
+                        if ($sb) {
+                            $sb->quantity += (int)$item->quantity;
+                            $sb->save();
+                        }
+                    }
+                }
+            }
+
+            // 2. إلغاء مدفوعات وسندات القبض المرتبطة
+            $invoice->payments()->delete();
+
+            // 3. حذف بنود الفاتورة وحذف الفاتورة
+            $invoice->items()->delete();
+            $invoice->delete();
+
+            AuditLog::create([
+                'user_id'        => $user->id ?? 1,
+                'action'         => 'invoice.deleted',
+                'auditable_type' => Invoice::class,
+                'auditable_id'   => $invoice->id,
+                'ip_address'     => request()->ip(),
+                'user_agent'     => request()->userAgent(),
+                'old_values'     => ['invoice_number' => $invNum],
+                'created_at'     => now(),
+            ]);
+        });
+
+        return redirect()->route('dashboard', ['tab' => 'sales'])->with('success', "تم حذف الفاتورة رقم ({$invNum}) بنجاح واسترجاع كمياتها للمستودع.");
     }
 
     /**
@@ -2504,7 +2609,7 @@ class DashboardController extends Controller
             ]);
         }
 
-        return $this->redirectBackWithTab($request, "تم إضافة الصنف ({$product->name_ar}) بنجاح.");
+        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم إضافة الصنف ({$product->name_ar}) بنجاح.");
     }
 
     /**
@@ -2513,7 +2618,7 @@ class DashboardController extends Controller
     public function updateProduct(Request $request, Product $product)
     {
         if (Auth::user()?->hasRole('call_center') || Auth::user()?->hasRole('customer')) {
-            return $this->redirectBackWithTab($request, null, 'غير مصرح لك بتعديل بيانات الأصناف.');
+            return redirect()->route('dashboard', ['tab' => 'products'])->with('error', 'غير مصرح لك بتعديل بيانات الأصناف.');
         }
 
         $validated = $request->validate([
@@ -2546,7 +2651,7 @@ class DashboardController extends Controller
 
         $product->update($validated);
 
-        return $this->redirectBackWithTab($request, "تم تحديث بيانات الصنف ({$product->name_ar}) بنجاح.");
+        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم تحديث بيانات الصنف ({$product->name_ar}) بنجاح.");
     }
 
     /**
@@ -2555,13 +2660,13 @@ class DashboardController extends Controller
     public function deleteProduct(Request $request, Product $product)
     {
         if (Auth::user()?->hasRole('call_center') || Auth::user()?->hasRole('customer')) {
-            return $this->redirectBackWithTab($request, null, 'غير مصرح لك بحذف الأصناف.');
+            return redirect()->route('dashboard', ['tab' => 'products'])->with('error', 'غير مصرح لك بحذف الأصناف.');
         }
 
         $name = $product->name_ar;
         $product->delete();
 
-        return $this->redirectBackWithTab($request, "تم حذف الصنف ({$name}) بنجاح.");
+        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم حذف الصنف ({$name}) بنجاح.");
     }
 
     /**
