@@ -6056,6 +6056,31 @@
                             <div id="serviceGrandTotalDisp" class="num" style="font-size: 1.8rem; font-weight: 800; color: #0284c7;">0.00 ر.س</div>
                         </div>
                     </div>
+
+                    <!-- باركود / QR Code ضريبي وتوثيقي للتصوير والمسح تحت الإجمالي مباشرة -->
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed rgba(2, 132, 199, 0.35); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; background: #ffffff; border-radius: 10px; padding: 0.85rem 1.2rem; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: #fff; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;">
+                                <img id="serviceLiveQrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=MARS-SERVICE-INVOICE" alt="QR Code" style="width: 85px; height: 85px; display: block;" onerror="this.onerror=null; this.src='https://quickchart.io/qr?size=95&text=MARS-SERVICE-INVOICE';">
+                            </div>
+                            <div>
+                                <div style="font-size: 12.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px;">
+                                    <span>📱 باركود QR ضريبي معتمد للتصوير والمسح</span>
+                                </div>
+                                <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
+                                    امسح بالكاميرا للتحقق من بيانات الفاتورة والإجمالي والضريبة
+                                </div>
+                                <div style="font-size: 11px; color: #0284c7; margin-top: 2px; font-weight: 600;" id="serviceBarcodeSummaryText">
+                                    المؤسسة: تقنية الفلاتر | القيمة: 0.00 ر.س
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: left; display: flex; flex-direction: column; align-items: center;">
+                            <!-- باركود خطي Code128 إضافي للمسح بالماسح الضوئي -->
+                            <img id="serviceLiveLinearBarcode" src="https://bwipjs-api.metafloor.com/?bcid=code128&text=SRV-TOTAL-000&scale=2&height=8&includetext=false" alt="Barcode" style="height: 38px; max-width: 170px;" onerror="this.style.display='none';">
+                            <span style="font-size: 10px; color: #94a3b8; margin-top: 2px; font-family: monospace;">CODE128 SCANNER READY</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap;">
@@ -7787,7 +7812,10 @@
 
         // Modal Controls
         function openNewSaleModal() { openModal('newSaleModal'); }
-        function openNewServiceInvoiceModal() { openModal('newServiceInvoiceModal'); }
+        function openNewServiceInvoiceModal() { 
+            openModal('newServiceInvoiceModal'); 
+            calculateServiceTotals();
+        }
         function openNewSupplierModal() { document.getElementById('newSupplierModal').classList.add('active'); }
         function openNewProductModal() {
             document.getElementById('newProductModal').classList.add('active');
@@ -8126,6 +8154,25 @@
             if (subDisp) subDisp.innerText = subtotal.toFixed(2);
             if (taxDisp) taxDisp.innerText = totalTax.toFixed(2);
             if (grandDisp) grandDisp.innerText = grandTotal.toFixed(2) + ' ر.س';
+
+            // Update Live QR Code & Barcode under service totals
+            const qrImg = document.getElementById('serviceLiveQrImg');
+            const summaryText = document.getElementById('serviceBarcodeSummaryText');
+            const linearBarcode = document.getElementById('serviceLiveLinearBarcode');
+
+            const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+            const qrPayload = encodeURIComponent(`Seller: FilterTech Co.\nVAT: 310999888700003\nDate: ${nowStr}\nSubtotal: ${subtotal.toFixed(2)} SAR\nVAT (15%): ${totalTax.toFixed(2)} SAR\nTotal: ${grandTotal.toFixed(2)} SAR`);
+
+            if (qrImg) {
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${qrPayload}`;
+            }
+            if (summaryText) {
+                summaryText.innerText = `الضريبة: ${totalTax.toFixed(2)} ر.س | الإجمالي المطلوب: ${grandTotal.toFixed(2)} ر.س`;
+            }
+            if (linearBarcode) {
+                const totalClean = grandTotal.toFixed(2).replace('.', '');
+                linearBarcode.src = `https://bwipjs-api.metafloor.com/?bcid=code128&text=SRV${totalClean}&scale=2&height=8&includetext=false`;
+            }
 
             const paidInput = document.getElementById('servicePaidAmount');
             if (paidInput && (!paidInput.value || parseFloat(paidInput.value) === 0)) {
