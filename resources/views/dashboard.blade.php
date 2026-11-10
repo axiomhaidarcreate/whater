@@ -1184,40 +1184,54 @@
             <!-- Navigation Links -->
             <nav class="sidebar-nav">
                 @if(!$isTechnician)
-                <div class="nav-section-title">التشغيل والميدان</div>
+                <!-- مجموعة: التشغيل والميدان (قابلة للطي والفتح Accordion) -->
+                <div class="nav-accordion-header" id="navGroupHeader_ops" onclick="toggleNavGroup('ops')" 
+                     style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.75rem; cursor: pointer; user-select: none; border-radius: 8px; margin: 0.35rem 0.5rem; background: rgba(255,255,255,0.03); transition: all 0.2s;"
+                     onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1rem;">💼</span>
+                        <span style="font-size: 0.85rem; font-weight: 800; color: #f1f5f9; letter-spacing: 0.2px;">التشغيل والميدان</span>
+                    </div>
+                    <div id="navGroupArrow_ops" style="width: 22px; height: 22px; border-radius: 50%; background: #10b981; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; transition: transform 0.25s ease; transform: rotate(180deg); box-shadow: 0 2px 4px rgba(16,185,129,0.3);">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                </div>
 
-                <button class="nav-link active" onclick="switchNavTab('overview', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                    <span>لوحة المؤشرات العامة</span>
-                </button>
+                <!-- العناصر الفرعية لقسم التشغيل والميدان -->
+                <div id="navGroupContent_ops" class="nav-accordion-content" style="transition: all 0.25s ease; padding-right: 0.4rem; border-right: 2px solid rgba(16,185,129,0.3); margin: 0 0.75rem 0.5rem 0;">
+                    <button class="nav-link active" onclick="switchNavTab('overview', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                        <span>لوحة المؤشرات العامة</span>
+                    </button>
 
-                <!-- شاشة المواعيد للعملاء والفنيين -->
-                <button class="nav-link" onclick="switchNavTab('appointments', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    <span>المواعيد</span>
-                </button>
+                    <!-- شاشة المواعيد للعملاء والفنيين -->
+                    <button class="nav-link" onclick="switchNavTab('appointments', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span>المواعيد</span>
+                    </button>
 
-                <button class="nav-link" onclick="switchNavTab('lifecycle', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                    <span>استحقاقات الفلاتر</span>
-                </button>
+                    <button class="nav-link" onclick="switchNavTab('lifecycle', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                        <span>استحقاقات الفلاتر</span>
+                    </button>
 
-                @if($isSuperAdmin || $isAdmin || $isGeneralMgr || $isCallCenter)
-                <button class="nav-link" onclick="switchNavTab('service-dues', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-                    <span>مستحقات الخدمة</span>
-                </button>
-                @endif
+                    @if($isSuperAdmin || $isAdmin || $isGeneralMgr || $isCallCenter)
+                    <button class="nav-link" onclick="switchNavTab('service-dues', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                        <span>مستحقات الخدمة</span>
+                    </button>
+                    @endif
 
-                <button class="nav-link" onclick="switchNavTab('tickets', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    <span>تذاكر الصيانة والعمليات</span>
-                </button>
+                    <button class="nav-link" onclick="switchNavTab('tickets', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <span>تذاكر الصيانة والعمليات</span>
+                    </button>
 
-                <button class="nav-link" onclick="switchNavTab('customers', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                    <span>العملاء ومحطات التحلية</span>
-                </button>
+                    <button class="nav-link" onclick="switchNavTab('customers', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                        <span>العملاء ومحطات التحلية</span>
+                    </button>
+                </div>
                 @else
                 <div class="nav-section-title">المهام الميدانية</div>
 
@@ -8098,6 +8112,23 @@
             document.body.classList.remove('sidebar-open-lock');
         }
 
+        // Accordion Group Toggle (طي وإظهار المجموعات الفرعية في القائمة الجانبية)
+        function toggleNavGroup(groupId) {
+            const content = document.getElementById('navGroupContent_' + groupId);
+            const arrow = document.getElementById('navGroupArrow_' + groupId);
+            if (!content) return;
+            const isHidden = (content.style.display === 'none');
+            if (isHidden) {
+                content.style.display = 'block';
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+                try { localStorage.setItem('nav_group_' + groupId, 'open'); } catch(e){}
+            } else {
+                content.style.display = 'none';
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
+                try { localStorage.setItem('nav_group_' + groupId, 'closed'); } catch(e){}
+            }
+        }
+
         // Tab Switcher — saves active tab to localStorage so after form submit it restores
         function switchNavTab(tabId, btnEl) {
             document.querySelectorAll('.sidebar-nav .nav-link').forEach(btn => btn.classList.remove('active'));
@@ -8106,6 +8137,17 @@
                      || document.querySelector(`.sidebar-nav [onclick*="switchNavTab('${tabId}'"]`);
             }
             if (btnEl) btnEl.classList.add('active');
+
+            // إذا كان التبويب ينتمي لمجموعة التشغيل والميدان، تأكد أن القائمة مفتوحة
+            const opsTabs = ['overview', 'appointments', 'lifecycle', 'service-dues', 'tickets', 'customers'];
+            if (opsTabs.includes(tabId)) {
+                const c = document.getElementById('navGroupContent_ops');
+                const a = document.getElementById('navGroupArrow_ops');
+                if (c && c.style.display === 'none') {
+                    c.style.display = 'block';
+                    if (a) a.style.transform = 'rotate(180deg)';
+                }
+            }
 
             document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
             const targetPane = document.getElementById('tab-' + tabId);
@@ -9964,6 +10006,19 @@
             const navBtn = document.querySelector(`.nav-link[onclick*="'${tabToOpen}'"]`)
                         || document.querySelector(`[onclick*="switchNavTab('${tabToOpen}'"]`);
             switchNavTab(tabToOpen, navBtn);
+
+            // استرجاع حالة طي/فتح مجموعة التشغيل والميدان
+            const opsGroupTabs = ['overview', 'appointments', 'lifecycle', 'service-dues', 'tickets', 'customers'];
+            if (!opsGroupTabs.includes(tabToOpen)) {
+                try {
+                    if (localStorage.getItem('nav_group_ops') === 'closed') {
+                        const c = document.getElementById('navGroupContent_ops');
+                        const a = document.getElementById('navGroupArrow_ops');
+                        if (c) c.style.display = 'none';
+                        if (a) a.style.transform = 'rotate(0deg)';
+                    }
+                } catch(e){}
+            }
 
             // Stamp all forms now so first interaction is already stamped
             document.querySelectorAll('form[method]').forEach(f => {
