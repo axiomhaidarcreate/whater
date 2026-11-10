@@ -680,7 +680,7 @@ class DashboardController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('dashboard', ['tab' => 'service-dues'])->with('success', $msg);
+            return redirect()->route('dashboard', ['tab' => 'service-dues'])->with('success', $msg)->with('_active_tab', 'service-dues');
 
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -699,7 +699,7 @@ class DashboardController extends Controller
         }
         $interaction = CustomerInteraction::findOrFail($id);
         $interaction->delete();
-        return redirect()->route('dashboard', ['tab' => 'service-dues'])->with('success', 'تم حذف السجل.');
+        return redirect()->route('dashboard', ['tab' => 'service-dues'])->with('success', 'تم حذف السجل.')->with('_active_tab', 'service-dues');
     }
 
     /**
@@ -2831,7 +2831,7 @@ class DashboardController extends Controller
             ]);
         }
 
-        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم إضافة الصنف ({$product->name_ar}) بنجاح.");
+        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم إضافة الصنف ({$product->name_ar}) بنجاح.")->with('_active_tab', 'products');
     }
 
     /**
@@ -2873,7 +2873,7 @@ class DashboardController extends Controller
 
         $product->update($validated);
 
-        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم تحديث بيانات الصنف ({$product->name_ar}) بنجاح.");
+        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم تحديث بيانات الصنف ({$product->name_ar}) بنجاح.")->with('_active_tab', 'products');
     }
 
     /**
@@ -2882,13 +2882,13 @@ class DashboardController extends Controller
     public function deleteProduct(Request $request, Product $product)
     {
         if (Auth::user()?->hasRole('call_center') || Auth::user()?->hasRole('customer')) {
-            return redirect()->route('dashboard', ['tab' => 'products'])->with('error', 'غير مصرح لك بحذف الأصناف.');
+            return redirect()->route('dashboard', ['tab' => 'products'])->with('error', 'غير مصرح لك بحذف الأصناف.')->with('_active_tab', 'products');
         }
 
         $name = $product->name_ar;
         $product->delete();
 
-        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم حذف الصنف ({$name}) بنجاح.");
+        return redirect()->route('dashboard', ['tab' => 'products'])->with('success', "تم حذف الصنف ({$name}) بنجاح.")->with('_active_tab', 'products');
     }
 
     /**

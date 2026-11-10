@@ -1206,7 +1206,6 @@
                 <button class="nav-link" onclick="switchNavTab('service-dues', this)">
                     <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                     <span>مستحقات الخدمة</span>
-                    <span class="nav-badge" style="background:#ef4444;">{{ $serviceDuesCount ?? 0 }}</span>
                 </button>
                 @endif
 
@@ -8058,17 +8057,20 @@
             'overview': 'لوحة المؤشرات والتشغيل العام',
             'appointments': 'إضافة وجدولة مواعيد العملاء والفنيين',
             'lifecycle': 'محرك استحقاقات الفلاتر والمواعيد',
+            'service-dues': 'مستحقات الخدمة — جدول العملاء والإجراءات',
             'tickets': 'إدارة تذاكر الصيانة والعمليات',
             'customers': 'ملفات العملاء ومحطات التحلية',
             'sales': 'شاشة المبيعات ونقاط البيع والفواتير الضريبية',
             'suppliers': 'شاشة الموردين وإدارة المشتريات والتوريد',
             'inventory': 'المخزون المركزي وسيارات الفنيين',
             'reports': 'تقارير الـ ERP والتحليلات وطباعة PDF',
+            'products': 'دليل الأصناف والمنتجات وقطع الغيار',
             'invoices': 'دفتر الفواتير والتحصيل المالي',
             'users': 'إدارة الموظفين وفريق العمل',
             'roles': 'شاشة الصلاحيات المطلقة والتحكم بالأدوار (RBAC)',
             'audit': 'سجل التدقيق الأمني (Audit Trail)',
-            'settings': 'إعدادات النظام وسياسات العمل'
+            'settings': 'إعدادات النظام وسياسات العمل',
+            'tech-trips': 'تتبع الفنيين والرحلات الميدانية'
         };
 
         // Cache Role Permissions from Backend
@@ -8099,6 +8101,10 @@
         // Tab Switcher — saves active tab to localStorage so after form submit it restores
         function switchNavTab(tabId, btnEl) {
             document.querySelectorAll('.sidebar-nav .nav-link').forEach(btn => btn.classList.remove('active'));
+            if (!btnEl) {
+                btnEl = document.querySelector(`.sidebar-nav .nav-link[onclick*="'${tabId}'"]`)
+                     || document.querySelector(`.sidebar-nav [onclick*="switchNavTab('${tabId}'"]`);
+            }
             if (btnEl) btnEl.classList.add('active');
 
             document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
@@ -9928,21 +9934,35 @@
             if (selector) loadRolePermissions(selector.value);
 
             // Determine which tab to open:
-            // 1) Session hint from backend (after form submit)
-            // 2) localStorage (last tab the user was on)
-            // 3) Default to 'overview'
+            // 1) URL parameter ?tab=... (e.g. from backend redirect)
+            // 2) Session hint from backend (after form submit)
+            // 3) localStorage (last tab the user was on)
+            // 4) Default to 'overview'
+            const validTabs = Object.keys(tabTitles);
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlTab = urlParams.get('tab');
+
             @if(session('_active_tab'))
-                const savedTab = '{{ session("_active_tab") }}';
+                const sessionTab = '{{ session("_active_tab") }}';
             @else
-                let savedTab = null;
-                try { savedTab = localStorage.getItem('erp_active_tab'); } catch(e){}
+                const sessionTab = null;
             @endif
 
-            const validTabs = Object.keys(tabTitles);
-            const tabToOpen = (savedTab && validTabs.includes(savedTab)) ? savedTab : 'overview';
+            let localTab = null;
+            try { localTab = localStorage.getItem('erp_active_tab'); } catch(e){}
+
+            let tabToOpen = 'overview';
+            if (urlTab && validTabs.includes(urlTab)) {
+                tabToOpen = urlTab;
+            } else if (sessionTab && validTabs.includes(sessionTab)) {
+                tabToOpen = sessionTab;
+            } else if (localTab && validTabs.includes(localTab)) {
+                tabToOpen = localTab;
+            }
 
             // Find the corresponding nav button and activate
-            const navBtn = document.querySelector(`.nav-link[onclick*="'${tabToOpen}'"]`);
+            const navBtn = document.querySelector(`.nav-link[onclick*="'${tabToOpen}'"]`)
+                        || document.querySelector(`[onclick*="switchNavTab('${tabToOpen}'"]`);
             switchNavTab(tabToOpen, navBtn);
 
             // Stamp all forms now so first interaction is already stamped

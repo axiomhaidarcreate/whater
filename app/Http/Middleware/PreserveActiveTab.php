@@ -22,7 +22,7 @@ class PreserveActiveTab
         // Only act on non-GET requests (form submissions)
         if (!$request->isMethod('GET')) {
             $tab = $request->input('_active_tab');
-            if ($tab && preg_match('/^[a-z_]{2,30}$/', $tab)) {
+            if ($tab && preg_match('/^[a-z0-9_-]{2,40}$/', $tab)) {
                 // Flash to session so the next page load can read it
                 session()->flash('_active_tab', $tab);
             }
