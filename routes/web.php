@@ -79,6 +79,11 @@ Route::post('/admin/reset-demo-data', [DashboardController::class, 'resetDemoDat
 Route::post('/admin/system-update', [DashboardController::class, 'systemUpdate'])->name('admin.system.update');
 Route::match(['get', 'post'], '/deploy-webhook', [DashboardController::class, 'deployWebhook'])->name('deploy.webhook');
 
+// تجديد CSRF Token (لمنع خطأ 419 عند بقاء الصفحة مفتوحة طويلاً)
+Route::get('/csrf-token/refresh', function () {
+    return response()->json(['token' => csrf_token()]);
+})->name('csrf.refresh');
+
 // شاشة الأصناف (Products Management)
 Route::post('/products/create', [DashboardController::class, 'createProduct'])->name('products.create');
 Route::post('/products/{product}/update', [DashboardController::class, 'updateProduct'])->name('products.update');
@@ -108,3 +113,9 @@ Route::post('/hr/custodies/create', [DashboardController::class, 'hrCreateCustod
 Route::post('/hr/tasks/create', [DashboardController::class, 'hrCreateTask'])->name('hr.tasks.create');
 Route::post('/hr/tasks/{id}/status', [DashboardController::class, 'hrUpdateTaskStatus'])->name('hr.tasks.status');
 Route::post('/hr/entitlements/create', [DashboardController::class, 'hrCreateEntitlement'])->name('hr.entitlements.create');
+
+// ============================================================
+// مستحقات الخدمة - Service Dues Actions
+// ============================================================
+Route::post('/service-dues/action', [DashboardController::class, 'recordServiceDueAction'])->name('service-dues.action');
+Route::delete('/service-dues/interactions/{id}/delete', [DashboardController::class, 'deleteServiceDueInteraction'])->name('service-dues.interaction.delete');

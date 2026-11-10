@@ -427,6 +427,12 @@ class DashboardController extends Controller
             ->take(6)
             ->get();
 
+        // 18. مستحقات الخدمة — جميع العملاء بأجهزة مسجلة
+        $serviceDues = $this->buildServiceDues();
+        $serviceDuesCount = collect($serviceDues)->filter(fn($d) =>
+            $d['days_left'] !== null && $d['days_left'] <= 30 && $d['device_status'] !== 'suspended'
+        )->count();
+
         return view('dashboard', compact(
             'currentUser',
             'isSuperAdmin',
@@ -476,8 +482,224 @@ class DashboardController extends Controller
             'hrDepartments',
             'hrKpis',
             'systemHrMetrics',
-            'hrEmployeePerformance'
+            'hrEmployeePerformance',
+            'serviceDues',
+            'serviceDuesCount',
         ));
+    }
+
+    /**
+     * بناء بيانات مستحقات الخدمة — جميع العملاء بأجهزة مسجلة
+     */
+    private function buildServiceDues(): array
+    {
+        $devices = CustomerDevice::with([
+            'customer',
+            'model',
+            'stages' => fn($q) => $q->orderBy('next_due_at'),
+        ])->get();
+
+        $result = [];
+        foreach ($devices as $device) {
+            $customer = $device->customer;
+            if (!$customer) continue;
+
+            // آخر تفاعل (اتصال)
+            $lastInteraction = CustomerInteraction::where('customer_id', $customer->id)
+                ->where('channel', 'phone_call')
+                ->latest('created_at')
+                ->first();
+
+            // سجل الاتصالات (آخر 5)
+            $interactions = CustomerInteraction::where('customer_id', $customer->id)
+                ->latest('created_at')
+                ->take(5)
+                ->get()
+                ->map(fn($i) => [
+                    'channel'       => $i->channel,
+                    'channel_label' => match($i->channel) {
+                        'phone_call'      => '📞 اتصال هاتفي',
+                        'whatsapp'        => '💬 واتساب',
+                        'system_reminder' => '🔔 تذكير',
+                        'visit'           => '🏠 زيارة',
+                        default           => $i->channel,
+                    },
+                    'outcome'       => $i->outcome,
+                    'outcome_label' => match($i->outcome) {
+                        'answered'         => '✅ رد',
+                        'no_answer'        => '📵 لم يرد',
+                        'scheduled'        => '📅 تم تحديد موعد',
+                        'postponed'        => '⏳ أجّل',
+                        'refused'          => '❌ رفض',
+                        'pending_follow_up'=> '⏰ متابعة',
+                        default            => $i->outcome,
+                    },
+                    'notes' => $i->notes,
+                    'date'  => $i->created_at ? $i->created_at->format('Y-m-d H:i') : '—',
+                ])->toArray();
+
+            // أقرب استحقاق
+            $nearestStage = $device->stages->first();
+            $daysLeft     = $nearestStage?->days_remaining;
+
+            $result[] = [
+                'customer_id'           => $customer->id,
+                'customer_name'         => $customer->name,
+                'phone'                 => $customer->phone ?? '—',
+                'device_id'             => $device->id,
+                'device_name'           => $device->model?->name ?? 'جهاز #' . $device->id,
+                'device_status'         => $device->status,
+                'stage_id'              => $nearestStage?->id,
+                'stage_name'            => $nearestStage?->stage_name_ar ?? '—',
+                'last_replacement'      => $nearestStage?->last_actual_replacement_at?->format('Y-m-d'),
+                'next_due'              => $nearestStage?->next_due_at?->format('Y-m-d'),
+                'days_left'             => $daysLeft,
+                'last_call'             => $lastInteraction?->created_at?->format('Y-m-d'),
+                'last_call_outcome'     => $lastInteraction ? match($lastInteraction->outcome) {
+                    'answered'  => '✅ رد',
+                    'no_answer' => '📵 لم يرد',
+                    'scheduled' => '📅 موعد',
+                    'postponed' => '⏳ أجّل',
+                    default     => $lastInteraction->outcome,
+                } : null,
+                'latest_interaction_id' => $lastInteraction?->id,
+                'interactions'          => $interactions,
+            ];
+        }
+
+        // ترتيب: الأكثر إلحاحاً أولاً
+        usort($result, fn($a, $b) => ($a['days_left'] ?? 999) <=> ($b['days_left'] ?? 999));
+
+        return $result;
+    }
+
+    /**
+     * تنفيذ إجراء من شاشة مستحقات الخدمة
+     */
+    public function recordServiceDueAction(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user || (!$user->hasRole('super_admin') && !$user->hasRole('system_admin')
+            && !$user->hasRole('general_manager') && !$user->hasRole('call_center'))) {
+            return redirect()->back()->with('error', 'غير مصرح بتنفيذ هذا الإجراء.');
+        }
+
+        $actionType = $request->input('action_type', 'note');
+        $customerId = $request->input('customer_id');
+        $deviceId   = $request->input('device_id');
+        $stageId    = $request->input('stage_id');
+        $notes      = $request->input('notes');
+
+        DB::beginTransaction();
+        try {
+            if ($actionType === 'call') {
+                // تسجيل الاتصال
+                CustomerInteraction::create([
+                    'customer_id'       => $customerId,
+                    'customer_device_id'=> $deviceId ?: null,
+                    'agent_id'          => $user->id,
+                    'channel'           => 'phone_call',
+                    'outcome'           => $request->input('call_outcome', 'no_answer'),
+                    'follow_up_date'    => $request->input('follow_up_date') ?: null,
+                    'notes'             => $notes,
+                    'created_at'        => now(),
+                ]);
+                $msg = 'تم تسجيل الاتصال بنجاح.';
+
+            } elseif ($actionType === 'appointment') {
+                // إضافة موعد عبر تذكرة صيانة
+                $appDate = $request->input('appointment_date');
+                $techId  = $request->input('technician_id');
+                MaintenanceTicket::create([
+                    'customer_id'    => $customerId,
+                    'device_id'      => $deviceId ?: null,
+                    'title'          => 'موعد صيانة / تغيير فلاتر',
+                    'type'           => 'maintenance',
+                    'status'         => 'scheduled',
+                    'scheduled_date' => $appDate,
+                    'technician_id'  => $techId ?: null,
+                    'notes'          => $notes,
+                    'created_by'     => $user->id,
+                ]);
+                CustomerInteraction::create([
+                    'customer_id'       => $customerId,
+                    'customer_device_id'=> $deviceId ?: null,
+                    'agent_id'          => $user->id,
+                    'channel'           => 'phone_call',
+                    'outcome'           => 'scheduled',
+                    'follow_up_date'    => $appDate,
+                    'notes'             => 'تم تحديد موعد صيانة. ' . $notes,
+                    'created_at'        => now(),
+                ]);
+                $msg = 'تم إضافة الموعد بنجاح.';
+
+            } elseif ($actionType === 'transfer') {
+                // نقل الفني: تحديث التذاكر المفتوحة
+                $newTechId = $request->input('new_technician_id');
+                $transferReason = $request->input('transfer_reason');
+                MaintenanceTicket::where('customer_id', $customerId)
+                    ->whereIn('status', ['open','scheduled','in_progress'])
+                    ->update(['technician_id' => $newTechId]);
+                CustomerInteraction::create([
+                    'customer_id'       => $customerId,
+                    'customer_device_id'=> $deviceId ?: null,
+                    'agent_id'          => $user->id,
+                    'channel'           => 'system_reminder',
+                    'outcome'           => 'pending_follow_up',
+                    'notes'             => 'تم نقل الموعد لفني آخر. السبب: ' . $transferReason . '. ' . $notes,
+                    'created_at'        => now(),
+                ]);
+                $msg = 'تم نقل الموعد للفني الجديد.';
+
+            } elseif ($actionType === 'suspend') {
+                // إيقاف الخدمة
+                CustomerDevice::where('id', $deviceId)->update(['status' => 'suspended']);
+                CustomerInteraction::create([
+                    'customer_id'       => $customerId,
+                    'customer_device_id'=> $deviceId ?: null,
+                    'agent_id'          => $user->id,
+                    'channel'           => 'system_reminder',
+                    'outcome'           => 'pending_follow_up',
+                    'notes'             => 'تم إيقاف الخدمة. السبب: ' . $request->input('suspend_reason') . '. ' . $notes,
+                    'created_at'        => now(),
+                ]);
+                $msg = 'تم إيقاف الخدمة للعميل.';
+
+            } else {
+                // ملاحظة فقط
+                CustomerInteraction::create([
+                    'customer_id'       => $customerId,
+                    'customer_device_id'=> $deviceId ?: null,
+                    'agent_id'          => $user->id,
+                    'channel'           => 'system_reminder',
+                    'outcome'           => 'pending_follow_up',
+                    'notes'             => $notes,
+                    'created_at'        => now(),
+                ]);
+                $msg = 'تم حفظ الملاحظة.';
+            }
+
+            DB::commit();
+            return redirect()->route('dashboard', ['tab' => 'service-dues'])->with('success', $msg);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'حدث خطأ: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * حذف سجل تفاعل (من صلاحية المدير فقط)
+     */
+    public function deleteServiceDueInteraction(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user || (!$user->hasRole('super_admin') && !$user->hasRole('system_admin') && !$user->hasRole('general_manager'))) {
+            return redirect()->back()->with('error', 'هذا الإجراء من صلاحية المدير فقط.');
+        }
+        $interaction = CustomerInteraction::findOrFail($id);
+        $interaction->delete();
+        return redirect()->route('dashboard', ['tab' => 'service-dues'])->with('success', 'تم حذف السجل.');
     }
 
     /**

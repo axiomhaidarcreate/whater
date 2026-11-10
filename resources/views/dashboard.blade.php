@@ -1202,6 +1202,14 @@
                     <span>استحقاقات الفلاتر</span>
                 </button>
 
+                @if($isSuperAdmin || $isAdmin || $isGeneralMgr || $isCallCenter)
+                <button class="nav-link" onclick="switchNavTab('service-dues', this)">
+                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                    <span>مستحقات الخدمة</span>
+                    <span class="nav-badge" style="background:#ef4444;">{{ $serviceDuesCount ?? 0 }}</span>
+                </button>
+                @endif
+
                 <button class="nav-link" onclick="switchNavTab('tickets', this)">
                     <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     <span>تذاكر الصيانة والعمليات</span>
@@ -4418,6 +4426,156 @@
                 </div>
             </div>
 
+            <!-- ================= TAB: SERVICE DUES (مستحقات الخدمة) ================= -->
+            @if($isSuperAdmin || $isAdmin || $isGeneralMgr || $isCallCenter)
+            <div id="tab-service-dues" class="tab-pane">
+                <div class="card-header-flex">
+                    <div>
+                        <h2 class="card-title">
+                            <span style="color:#ef4444;">📋</span> مستحقات الخدمة — جدول العملاء
+                        </h2>
+                        <p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0 0;">
+                            جميع العملاء المسجلين بأجهزة نشطة — تابع مواعيد الصيانة واتخذ الإجراءات
+                        </p>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <!-- فلتر الحالة -->
+                        <select id="sdFilterStatus" onchange="filterServiceDues()" class="form-control" style="width:160px;font-size:0.8rem;">
+                            <option value="">الكل</option>
+                            <option value="green">🟢 يستحق هذا الشهر</option>
+                            <option value="red">🔴 تحت الخدمة الآن</option>
+                            <option value="yellow">🟡 موقوف / مشاكل</option>
+                        </select>
+                        <input type="text" id="sdSearch" oninput="filterServiceDues()" class="form-control" placeholder="🔍 بحث باسم العميل أو الهاتف..." style="width:220px;font-size:0.8rem;">
+                    </div>
+                </div>
+
+                <!-- مفتاح ألوان -->
+                <div style="display:flex;gap:1rem;padding:0.75rem 1rem;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:1rem;flex-wrap:wrap;">
+                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#22c55e;"></span> يستحق خدمة هذا الشهر (30 يوم)</span>
+                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ef4444;"></span> تحت الخدمة الآن (فني مكلّف)</span>
+                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#eab308;"></span> موقوف / مشاكل في الخدمة</span>
+                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#94a3b8;"></span> لا يستحق قريباً</span>
+                </div>
+
+                <!-- جدول المستحقات -->
+                <div class="table-wrap">
+                    <table class="data-table" id="serviceDuesTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>العميل</th>
+                                <th>الهاتف</th>
+                                <th>الجهاز / المرحلة</th>
+                                <th>آخر صيانة</th>
+                                <th>الموعد القادم</th>
+                                <th>المتبقي</th>
+                                <th>الحالة</th>
+                                <th>آخر اتصال</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($serviceDues ?? [] as $i => $due)
+                        @php
+                            $daysLeft = $due['days_left'];
+                            $devStatus = $due['device_status'];
+                            // تحديد لون الصف
+                            if ($devStatus === 'suspended') {
+                                $rowColor = 'rgba(234,179,8,0.08)';
+                                $dotColor = '#eab308';
+                                $sdLabel = '🟡 موقوف';
+                                $sdClass = 'yellow';
+                            } elseif ($devStatus === 'in_service') {
+                                $rowColor = 'rgba(239,68,68,0.08)';
+                                $dotColor = '#ef4444';
+                                $sdLabel = '🔴 تحت الخدمة';
+                                $sdClass = 'red';
+                            } elseif ($daysLeft !== null && $daysLeft <= 30) {
+                                $rowColor = 'rgba(34,197,94,0.08)';
+                                $dotColor = '#22c55e';
+                                $sdLabel = $daysLeft <= 0 ? '🔴 متأخر' : '🟢 هذا الشهر';
+                                $sdClass = $daysLeft <= 0 ? 'red' : 'green';
+                            } else {
+                                $rowColor = 'transparent';
+                                $dotColor = '#94a3b8';
+                                $sdLabel = '⬜ لا يستحق';
+                                $sdClass = 'grey';
+                            }
+                        @endphp
+                        <tr style="background:{{ $rowColor }};" data-sd-status="{{ $sdClass }}"
+                            data-sd-text="{{ strtolower($due['customer_name'] . ' ' . $due['phone']) }}">
+                            <td class="num">{{ $i + 1 }}</td>
+                            <td style="font-weight:700;">{{ $due['customer_name'] }}</td>
+                            <td style="direction:ltr;text-align:right;font-size:0.85rem;">{{ $due['phone'] }}</td>
+                            <td style="font-size:0.82rem;">{{ $due['device_name'] }}<br><span style="color:var(--text-secondary);">{{ $due['stage_name'] }}</span></td>
+                            <td style="font-size:0.82rem;">{{ $due['last_replacement'] ?? '—' }}</td>
+                            <td style="font-weight:700;font-size:0.85rem;color:{{ $daysLeft !== null && $daysLeft <= 7 ? '#ef4444' : 'inherit' }};">
+                                {{ $due['next_due'] ?? '—' }}
+                            </td>
+                            <td>
+                                @if($daysLeft !== null)
+                                    @if($daysLeft < 0)
+                                        <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef4444;">
+                                            متأخر {{ abs($daysLeft) }} يوم
+                                        </span>
+                                    @elseif($daysLeft === 0)
+                                        <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;">اليوم!</span>
+                                    @elseif($daysLeft <= 7)
+                                        <span class="badge" style="background:rgba(234,179,8,0.15);color:#eab308;">{{ $daysLeft }} أيام</span>
+                                    @else
+                                        <span class="badge">{{ $daysLeft }} يوم</span>
+                                    @endif
+                                @else
+                                    <span style="color:var(--text-secondary);">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;">
+                                    <span style="width:9px;height:9px;border-radius:50%;background:{{ $dotColor }};display:inline-block;"></span>
+                                    {{ $sdLabel }}
+                                </span>
+                            </td>
+                            <td style="font-size:0.78rem;color:var(--text-secondary);">
+                                @if($due['last_call'])
+                                    {{ $due['last_call_outcome'] }}<br>{{ $due['last_call'] }}
+                                @else
+                                    <span style="color:#94a3b8;">لا يوجد</span>
+                                @endif
+                            </td>
+                            <td>
+                                <button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.78rem;"
+                                    onclick="openServiceDueModal({{ json_encode($due) }})">
+                                    ⚡ إجراء
+                                </button>
+                                @if($isSuperAdmin || $isAdmin || $isGeneralMgr)
+                                <form method="POST" action="{{ route('service-dues.interaction.delete', $due['latest_interaction_id'] ?? 0) }}"
+                                    style="display:inline;"
+                                    onsubmit="return confirm('حذف آخر سجل تفاعل لهذا العميل؟');">
+                                    @csrf
+                                    <input type="hidden" name="_active_tab" value="service-dues">
+                                    <button type="submit" class="btn btn-outline" style="padding:0.3rem 0.6rem;font-size:0.78rem;border-color:#ef4444;color:#ef4444;"
+                                        {{ !$due['latest_interaction_id'] ? 'disabled' : '' }}>
+                                        🗑️
+                                    </button>
+                                </form>
+                                @endif
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="10" style="text-align:center;padding:3rem;color:var(--text-secondary);">
+                                <div style="font-size:2.5rem;margin-bottom:0.5rem;">📋</div>
+                                <div>لا يوجد عملاء مسجلون بأجهزة حتى الآن</div>
+                            </td>
+                        </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
             <!-- ================= TAB: PRODUCTS SCREEN (شاشة الأصناف) ================= -->
             @if($isSuperAdmin || $isSystemAdmin || $isAccountant)
             <div id="tab-products" class="tab-pane">
@@ -6461,32 +6619,52 @@
                     </div>
                 </div>
 
-                {{-- ===== قسم عداد صلاحية الفلتر ===== --}}
-                <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.5rem;">
-                    <div style="font-weight: 700; color: #10b981; margin-bottom: 0.75rem; font-size: 0.95rem;">
-                        ⏱️ عداد صلاحية الفلتر (للتذكير التلقائي عند البيع)
+                {{-- ===== قسم عداد صلاحية الفلتر (بالأشهر فقط) ===== --}}
+                <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.75rem;">
+                    <div style="font-weight: 700; color: #10b981; margin-bottom: 0.75rem; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span>⏱️</span>
+                            <span>عداد صلاحية الفلتر (للتذكير التلقائي عند البيع)</span>
+                        </span>
+                        <span style="font-size: 0.75rem; background: rgba(16,185,129,0.15); color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">بالأشهر فقط</span>
                     </div>
-                    <div class="form-row-3">
+
+                    <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label>نوع العداد:</label>
-                            <select name="reminder_type" class="form-control" onchange="toggleNewProductLifeFields(this.value)">
-                                <option value="months">بالأشهر فقط</option>
-                                <option value="liters">بالليترات فقط</option>
-                                <option value="both">أشهر + ليترات</option>
+                            <select name="reminder_type" class="form-control" style="font-weight: 600;">
+                                <option value="months" selected>بالأشهر فقط</option>
                             </select>
                         </div>
-                        <div class="form-group" id="newProd_months_wrap">
-                            <label>مدة الصلاحية (شهر):</label>
-                            <input type="number" name="filter_life_months" class="form-control num" value="6" min="0" max="120" placeholder="مثال: 6">
-                        </div>
-                        <div class="form-group" id="newProd_liters_wrap" style="display:none;">
-                            <label>سعة الليترات (لتر):</label>
-                            <input type="number" name="filter_life_liters" class="form-control num" value="0" min="0" placeholder="مثال: 3785">
+
+                        <div class="form-group">
+                            <label>مدة الصلاحية (شهر): <span style="color:#ef4444">*</span></label>
+                            <input type="number" name="filter_life_months" id="newProdLifeMonths" class="form-control num" value="6" min="0" max="120" placeholder="6" oninput="updateNewProdLifePreview()" style="font-weight: 700; font-size: 1rem;">
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top:0.25rem;">
-                        <label>ملاحظة العداد (اختياري):</label>
-                        <input type="text" name="filter_life_note" class="form-control" placeholder="مثال: يُغيَّر كل 6 أشهر أو 1000 غالون أيهما أسبق">
+
+                    <!-- أزرار اختيار سريع للشهور الشائعة -->
+                    <div style="margin-top: 0.6rem;">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.35rem; display: block;">اختيار سريع للمدة الشائعة:</label>
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                            <button type="button" class="btn-preset-chip" onclick="setNewProdPresetLife(1, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">1 شهر (مرحلة 1)</button>
+                            <button type="button" class="btn-preset-chip" onclick="setNewProdPresetLife(3, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">3 أشهر (مرحلة 2 و 3)</button>
+                            <button type="button" class="btn-preset-chip active" onclick="setNewProdPresetLife(6, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #10b981; background: #10b981; color: #fff; cursor: pointer; font-weight: 700;">6 أشهر (نصف سنوي)</button>
+                            <button type="button" class="btn-preset-chip" onclick="setNewProdPresetLife(12, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">12 شهر (ممبرين / سنوي)</button>
+                            <button type="button" class="btn-preset-chip" onclick="setNewProdPresetLife(24, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">24 شهر (سنتين)</button>
+                            <button type="button" class="btn-preset-chip" onclick="setNewProdPresetLife(0, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; color: #64748b;">بدون عداد</button>
+                        </div>
+                    </div>
+
+                    <!-- معاينة حية لموعد تذكير خدمة العملاء -->
+                    <div style="margin-top: 0.75rem; padding: 0.6rem 0.85rem; background: rgba(255,255,255,0.7); border: 1px dashed #10b981; border-radius: 8px; font-size: 0.82rem; color: #047857; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <span id="newProdLifePreviewText">عند بيع هذا الصنف، سيتم جدولة تذكير آلي لخدمة العملاء بعد <b>6 شهر</b> للتواصل مع العميل.</span>
+                        <span id="newProdLifePreviewTargetDate" style="font-weight: 700; background: #ecfdf5; color: #047857; padding: 0.2rem 0.5rem; border-radius: 4px;"></span>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 0.6rem; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">ملاحظة العداد (اختياري):</label>
+                        <input type="text" name="filter_life_note" class="form-control" placeholder="مثال: يفضل تبديل الشمعة قبل حلول الصيف" style="font-size: 0.85rem;">
                     </div>
                 </div>
 
@@ -6495,6 +6673,146 @@
                     <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669);">حفظ وإضافة الصنف</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         MODAL: Service Due Action (إجراءات مستحقات الخدمة)
+         ===================================================== -->
+    <div id="serviceDueModal" class="modal">
+        <div class="modal-content modal-lg" style="max-width:720px;">
+            <div class="modal-header">
+                <h3 style="font-weight:700;color:#ef4444;">⚡ إجراءات الخدمة — <span id="sdModalCustomerName"></span></h3>
+                <button class="close-btn" onclick="closeModal('serviceDueModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem;">
+
+                <!-- بيانات العميل -->
+                <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:1rem;margin-bottom:1rem;display:flex;gap:2rem;flex-wrap:wrap;">
+                    <div><span style="color:var(--text-secondary);font-size:0.8rem;">الهاتف</span><br><strong id="sdModalPhone" dir="ltr" style="font-size:1.05rem;"></strong></div>
+                    <div><span style="color:var(--text-secondary);font-size:0.8rem;">الجهاز</span><br><strong id="sdModalDevice"></strong></div>
+                    <div><span style="color:var(--text-secondary);font-size:0.8rem;">الموعد القادم</span><br><strong id="sdModalNextDue" style="color:#ef4444;"></strong></div>
+                    <div><span style="color:var(--text-secondary);font-size:0.8rem;">المتبقي</span><br><strong id="sdModalDaysLeft"></strong></div>
+                </div>
+
+                <!-- أزرار الإجراءات السريعة -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+                    <button onclick="sdSetAction('call')" id="sdBtn_call" class="sd-action-btn" style="background:rgba(16,185,129,0.1);border:2px solid #10b981;border-radius:10px;padding:0.75rem 0.5rem;cursor:pointer;font-size:0.85rem;font-weight:700;color:#10b981;transition:all 0.2s;">
+                        📞 تسجيل اتصال
+                    </button>
+                    <button onclick="sdSetAction('appointment')" id="sdBtn_appointment" class="sd-action-btn" style="background:rgba(2,132,199,0.1);border:2px solid #0284c7;border-radius:10px;padding:0.75rem 0.5rem;cursor:pointer;font-size:0.85rem;font-weight:700;color:#0284c7;transition:all 0.2s;">
+                        📅 إضافة موعد
+                    </button>
+                    <button onclick="sdSetAction('transfer')" id="sdBtn_transfer" class="sd-action-btn" style="background:rgba(139,92,246,0.1);border:2px solid #8b5cf6;border-radius:10px;padding:0.75rem 0.5rem;cursor:pointer;font-size:0.85rem;font-weight:700;color:#8b5cf6;transition:all 0.2s;">
+                        🔄 نقل لفني آخر
+                    </button>
+                    <button onclick="sdSetAction('suspend')" id="sdBtn_suspend" class="sd-action-btn" style="background:rgba(234,179,8,0.1);border:2px solid #eab308;border-radius:10px;padding:0.75rem 0.5rem;cursor:pointer;font-size:0.85rem;font-weight:700;color:#eab308;transition:all 0.2s;">
+                        ⏸️ إيقاف الخدمة
+                    </button>
+                    <button onclick="sdSetAction('note')" id="sdBtn_note" class="sd-action-btn" style="background:rgba(148,163,184,0.1);border:2px solid #94a3b8;border-radius:10px;padding:0.75rem 0.5rem;cursor:pointer;font-size:0.85rem;font-weight:700;color:#94a3b8;transition:all 0.2s;">
+                        📝 ملاحظة فقط
+                    </button>
+                </div>
+
+                <!-- نموذج الإجراء -->
+                <form id="serviceDueForm" method="POST" action="">
+                    @csrf
+                    <input type="hidden" name="_active_tab" value="service-dues">
+                    <input type="hidden" name="action_type" id="sdActionType" value="call">
+                    <input type="hidden" name="customer_id" id="sdCustomerId">
+                    <input type="hidden" name="device_id" id="sdDeviceId">
+                    <input type="hidden" name="stage_id" id="sdStageId">
+
+                    <!-- حقول تسجيل الاتصال -->
+                    <div id="sdSection_call">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>نتيجة الاتصال: <span style="color:#ef4444">*</span></label>
+                                <select name="call_outcome" class="form-control">
+                                    <option value="answered">✅ رد وتم التنسيق</option>
+                                    <option value="no_answer">📵 لم يرد</option>
+                                    <option value="scheduled">📅 تم تحديد موعد</option>
+                                    <option value="postponed">⏳ طلب تأجيل</option>
+                                    <option value="refused">❌ رفض الخدمة</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>موعد المتابعة (اختياري):</label>
+                                <input type="date" name="follow_up_date" class="form-control" id="sdFollowUpDate">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- حقول إضافة موعد -->
+                    <div id="sdSection_appointment" style="display:none;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>تاريخ الموعد: <span style="color:#ef4444">*</span></label>
+                                <input type="date" name="appointment_date" class="form-control" id="sdAppDate">
+                            </div>
+                            <div class="form-group">
+                                <label>الفني المكلّف:</label>
+                                <select name="technician_id" class="form-control">
+                                    <option value="">— اختر الفني —</option>
+                                    @foreach($technicians ?? [] as $tech)
+                                    <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- حقول نقل الفني -->
+                    <div id="sdSection_transfer" style="display:none;">
+                        <div class="form-group">
+                            <label>الفني الجديد: <span style="color:#ef4444">*</span></label>
+                            <select name="new_technician_id" class="form-control">
+                                <option value="">— اختر الفني الجديد —</option>
+                                @foreach($technicians ?? [] as $tech)
+                                <option value="{{ $tech->id }}">{{ $tech->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>سبب النقل:</label>
+                            <input type="text" name="transfer_reason" class="form-control" placeholder="مثال: الفني الأول في إجازة">
+                        </div>
+                    </div>
+
+                    <!-- حقول الإيقاف -->
+                    <div id="sdSection_suspend" style="display:none;">
+                        <div class="form-group">
+                            <label>سبب إيقاف الخدمة: <span style="color:#ef4444">*</span></label>
+                            <select name="suspend_reason" class="form-control">
+                                <option value="financial_issue">مشكلة مالية / عدم دفع</option>
+                                <option value="customer_request">طلب العميل</option>
+                                <option value="device_broken">عطل في الجهاز</option>
+                                <option value="address_change">تغيير العنوان</option>
+                                <option value="other">أخرى</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ملاحظات (تظهر دائماً) -->
+                    <div class="form-group" style="margin-top:0.75rem;">
+                        <label>ملاحظات:</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="أضف ملاحظاتك هنا..."></textarea>
+                    </div>
+
+                    <!-- سجل الاتصالات السابقة -->
+                    <div id="sdCallHistory" style="margin-top:1rem;">
+                        <div style="font-weight:700;font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem;">📋 سجل الاتصالات السابقة:</div>
+                        <div id="sdCallHistoryList" style="max-height:160px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.5rem;font-size:0.8rem;"></div>
+                    </div>
+
+                    <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:1.25rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('serviceDueModal')">إلغاء</button>
+                        <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626);">
+                            ✅ تنفيذ الإجراء
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -6590,30 +6908,45 @@
                 </div>
 
                 {{-- ===== قسم عداد صلاحية الفلتر (تعديل) ===== --}}
-                <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.5rem;">
-                    <div style="font-weight: 700; color: #10b981; margin-bottom: 0.75rem; font-size: 0.95rem;">
-                        ⏱️ عداد صلاحية الفلتر
+                <div style="background: rgba(2,132,199,0.06); border: 1px solid rgba(2,132,199,0.25); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.5rem;">
+                    <div style="font-weight: 700; color: #0284c7; margin-bottom: 0.75rem; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+                        <span>⏱️ عداد صلاحية الفلتر (للتذكير الدوري)</span>
+                        <span style="font-size: 0.75rem; background: rgba(2,132,199,0.15); color: #0284c7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">بالأشهر فقط</span>
                     </div>
-                    <div class="form-row-3">
+                    <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label>نوع العداد:</label>
-                            <select name="reminder_type" id="editProdReminderType" class="form-control" onchange="toggleEditProductLifeFields(this.value)">
-                                <option value="months">بالأشهر فقط</option>
-                                <option value="liters">بالليترات فقط</option>
-                                <option value="both">أشهر + ليترات</option>
+                            <select name="reminder_type" id="editProdReminderType" class="form-control" style="font-weight: 600;">
+                                <option value="months" selected>بالأشهر فقط</option>
                             </select>
                         </div>
-                        <div class="form-group" id="editProd_months_wrap">
+                        <div class="form-group">
                             <label>مدة الصلاحية (شهر):</label>
-                            <input type="number" name="filter_life_months" id="editProdLifeMonths" class="form-control num" value="0" min="0" max="120">
-                        </div>
-                        <div class="form-group" id="editProd_liters_wrap" style="display:none;">
-                            <label>سعة الليترات (لتر):</label>
-                            <input type="number" name="filter_life_liters" id="editProdLifeLiters" class="form-control num" value="0" min="0">
+                            <input type="number" name="filter_life_months" id="editProdLifeMonths" class="form-control num" value="0" min="0" max="120" placeholder="6" oninput="updateEditProdLifePreview()" style="font-weight: 700; font-size: 1rem;">
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top:0.25rem;">
-                        <label>ملاحظة العداد (اختياري):</label>
+
+                    <!-- أزرار اختيار سريع للشهور الشائعة -->
+                    <div style="margin-top: 0.6rem;">
+                        <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.35rem; display: block;">اختيار سريع للمدة:</label>
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                            <button type="button" class="btn-preset-chip-edit" onclick="setEditProdPresetLife(1, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">1 شهر</button>
+                            <button type="button" class="btn-preset-chip-edit" onclick="setEditProdPresetLife(3, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">3 أشهر</button>
+                            <button type="button" class="btn-preset-chip-edit" onclick="setEditProdPresetLife(6, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #0284c7; background: #0284c7; color: #fff; cursor: pointer; font-weight: 700;">6 أشهر</button>
+                            <button type="button" class="btn-preset-chip-edit" onclick="setEditProdPresetLife(12, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">12 شهر</button>
+                            <button type="button" class="btn-preset-chip-edit" onclick="setEditProdPresetLife(24, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">24 شهر</button>
+                            <button type="button" class="btn-preset-chip-edit" onclick="setEditProdPresetLife(0, this)" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; color: #64748b;">بدون عداد</button>
+                        </div>
+                    </div>
+
+                    <!-- معاينة حية للموعد -->
+                    <div style="margin-top: 0.75rem; padding: 0.6rem 0.85rem; background: rgba(255,255,255,0.7); border: 1px dashed #0284c7; border-radius: 8px; font-size: 0.82rem; color: #0369a1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <span id="editProdLifePreviewText">عند بيع هذا الصنف، سيتم جدولة تذكير آلي لخدمة العملاء.</span>
+                        <span id="editProdLifePreviewTargetDate" style="font-weight: 700; background: #f0f9ff; color: #0284c7; padding: 0.2rem 0.5rem; border-radius: 4px;"></span>
+                    </div>
+
+                    <div class="form-group" style="margin-top:0.6rem; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">ملاحظة العداد (اختياري):</label>
                         <input type="text" name="filter_life_note" id="editProdLifeNote" class="form-control" placeholder="مثال: يُغيَّر كل 6 أشهر">
                     </div>
                 </div>
@@ -8012,12 +8345,16 @@
             document.getElementById('editProdSellingPrice').value = p.selling_price || 0;
             // عداد الصلاحية
             const rType = p.reminder_type || 'months';
-            document.getElementById('editProdReminderType').value = rType;
-            document.getElementById('editProdLifeMonths').value  = p.filter_life_months || 0;
-            document.getElementById('editProdLifeLiters').value  = p.filter_life_liters || 0;
-            document.getElementById('editProdLifeNote').value    = p.filter_life_note || '';
-            toggleEditProductLifeFields(rType);
-            updateEditProdLifePreview();
+            const rTypeEl = document.getElementById('editProdReminderType');
+            if (rTypeEl) rTypeEl.value = rType;
+            const mEl = document.getElementById('editProdLifeMonths');
+            if (mEl) mEl.value = p.filter_life_months || 0;
+            const lEl = document.getElementById('editProdLifeLiters');
+            if (lEl) lEl.value = p.filter_life_liters || 0;
+            const nEl = document.getElementById('editProdLifeNote');
+            if (nEl) nEl.value = p.filter_life_note || '';
+            if (typeof toggleEditProductLifeFields === 'function') toggleEditProductLifeFields(rType);
+            if (typeof updateEditProdLifePreview === 'function') updateEditProdLifePreview();
             document.querySelectorAll('#editProductModal .btn-preset-chip-edit').forEach(b => {
                 b.style.background = '#fff';
                 b.style.color = '#334155';
@@ -8839,9 +9176,8 @@
         function toggleEditProductLifeFields(type) {
             const mWrap = document.getElementById('editProd_months_wrap');
             const lWrap = document.getElementById('editProd_liters_wrap');
-            if (!mWrap || !lWrap) return;
-            mWrap.style.display = (type === 'months' || type === 'both') ? 'block' : 'none';
-            lWrap.style.display = (type === 'liters' || type === 'both') ? 'block' : 'none';
+            if (mWrap) mWrap.style.display = (type === 'months' || type === 'both') ? 'block' : 'none';
+            if (lWrap) lWrap.style.display = (type === 'liters' || type === 'both') ? 'block' : 'none';
         }
 
         // ============================================================
@@ -10141,6 +10477,125 @@
                 document.getElementById('systemUpdateForm').submit();
             }
         }
+
+        // ================================================================
+        // 📋 Service Dues Tab — مستحقات الخدمة JS
+        // ================================================================
+        function filterServiceDues() {
+            const q = (document.getElementById('sdSearch')?.value || '').toLowerCase();
+            const st = document.getElementById('sdFilterStatus')?.value || '';
+            document.querySelectorAll('#serviceDuesTable tbody tr[data-sd-status]').forEach(row => {
+                const matchText = !q || (row.dataset.sdText || '').includes(q);
+                const matchStatus = !st || row.dataset.sdStatus === st;
+                row.style.display = (matchText && matchStatus) ? '' : 'none';
+            });
+        }
+
+        function sdSetAction(action) {
+            // reset all buttons
+            document.querySelectorAll('.sd-action-btn').forEach(b => b.style.opacity = '0.5');
+            const activeBtn = document.getElementById('sdBtn_' + action);
+            if (activeBtn) activeBtn.style.opacity = '1';
+            // hide all sections
+            ['call','appointment','transfer','suspend'].forEach(s => {
+                const el = document.getElementById('sdSection_' + s);
+                if (el) el.style.display = 'none';
+            });
+            const show = document.getElementById('sdSection_' + action);
+            if (show) show.style.display = 'block';
+            document.getElementById('sdActionType').value = action;
+        }
+
+        function openServiceDueModal(due) {
+            document.getElementById('sdModalCustomerName').textContent = due.customer_name || '';
+            document.getElementById('sdModalPhone').textContent = due.phone || '—';
+            document.getElementById('sdModalDevice').textContent = (due.device_name || '') + ' / ' + (due.stage_name || '');
+            document.getElementById('sdModalNextDue').textContent = due.next_due || '—';
+            const dl = due.days_left;
+            document.getElementById('sdModalDaysLeft').textContent = dl !== null && dl !== undefined
+                ? (dl < 0 ? 'متأخر ' + Math.abs(dl) + ' يوم' : dl + ' يوم')
+                : '—';
+
+            document.getElementById('sdCustomerId').value = due.customer_id || '';
+            document.getElementById('sdDeviceId').value = due.device_id || '';
+            document.getElementById('sdStageId').value = due.stage_id || '';
+
+            // set form action
+            document.getElementById('serviceDueForm').action = '/service-dues/action';
+
+            // set default date fields
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tStr = tomorrow.toISOString().split('T')[0];
+            const appDate = document.getElementById('sdAppDate');
+            if (appDate) appDate.value = tStr;
+            const fuDate = document.getElementById('sdFollowUpDate');
+            if (fuDate) fuDate.value = tStr;
+
+            // load call history
+            const histList = document.getElementById('sdCallHistoryList');
+            if (histList) {
+                if (due.interactions && due.interactions.length) {
+                    histList.innerHTML = due.interactions.map(i =>
+                        `<div style="padding:0.35rem 0.5rem;border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <strong>${i.channel_label || i.channel}</strong>
+                            — ${i.outcome_label || i.outcome}
+                            <span style="color:var(--text-secondary);float:left;">${i.date}</span>
+                            ${i.notes ? '<br><span style="color:var(--text-secondary);">' + i.notes + '</span>' : ''}
+                        </div>`
+                    ).join('');
+                } else {
+                    histList.innerHTML = '<div style="color:var(--text-secondary);padding:0.5rem;">لا يوجد سجل اتصالات سابق</div>';
+                }
+            }
+
+            // reset to default action
+            sdSetAction('call');
+            document.getElementById('serviceDueModal').classList.add('active');
+        }
+
+        // ================================================================
+        // 🔐 CSRF Token Auto-Refresh — يمنع خطأ 419 Page Expired
+        // يجدد التوكن كل 10 دقائق وقبل كل إرسال نموذج
+        // ================================================================
+        async function refreshCsrfToken() {
+            try {
+                const resp = await fetch('/csrf-token/refresh', {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                if (!resp.ok) return null;
+                const data = await resp.json();
+                if (!data.token) return null;
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                if (metaTag) metaTag.setAttribute('content', data.token);
+                document.querySelectorAll('input[name="_token"]').forEach(inp => {
+                    inp.value = data.token;
+                });
+                return data.token;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // تجديد تلقائي كل 10 دقائق
+        setInterval(refreshCsrfToken, 600000);
+
+        // اعتراض كل form submit وتجديد التوكن قبل الإرسال
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', async function (e) {
+                    const tokenInput = this.querySelector('input[name="_token"]');
+                    if (!tokenInput) return;
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    const freshToken = await refreshCsrfToken();
+                    if (freshToken) tokenInput.value = freshToken;
+                    this.submit();
+                });
+            });
+        });
 
 </script>
 </body>
