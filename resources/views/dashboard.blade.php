@@ -1306,30 +1306,44 @@
                 @endif
 
                 @if($isSuperAdmin)
-                <div class="nav-section-title">الإدارة والصلاحيات (Super Admin)</div>
+                <!-- مجموعة: الإدارة والصلاحيات (قابلة للطي والفتح Accordion) -->
+                <div class="nav-accordion-header" id="navGroupHeader_admin" onclick="toggleNavGroup('admin')" 
+                     style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.75rem; cursor: pointer; user-select: none; border-radius: 8px; margin: 0.35rem 0.5rem; background: rgba(255,255,255,0.03); transition: all 0.2s;"
+                     onmouseover="this.style.background='rgba(255,255,255,0.07)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1rem;">🛡️</span>
+                        <span style="font-size: 0.85rem; font-weight: 800; color: #f1f5f9; letter-spacing: 0.2px;">الإدارة والصلاحيات</span>
+                    </div>
+                    <div id="navGroupArrow_admin" style="width: 22px; height: 22px; border-radius: 50%; background: #10b981; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; transition: transform 0.25s ease; transform: rotate(180deg); box-shadow: 0 2px 4px rgba(16,185,129,0.3);">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                </div>
 
-                <!-- شاشة الصلاحيات المطلقة -->
-                <button class="nav-link" onclick="switchNavTab('roles', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span>شاشة الصلاحيات والأدوار</span>
-                    <span class="nav-badge" style="background: #f59e0b; color: #000;">{{ count($allRoles) }}</span>
-                </button>
+                <!-- العناصر الفرعية لقسم الإدارة والصلاحيات -->
+                <div id="navGroupContent_admin" class="nav-accordion-content" style="transition: all 0.25s ease; padding-right: 0.4rem; border-right: 2px solid rgba(245,158,11,0.3); margin: 0 0.75rem 0.5rem 0;">
+                    <!-- شاشة الصلاحيات المطلقة -->
+                    <button class="nav-link" onclick="switchNavTab('roles', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        <span>شاشة الصلاحيات والأدوار</span>
+                        <span class="nav-badge" style="background: #f59e0b; color: #000;">{{ count($allRoles) }}</span>
+                    </button>
 
-                <button class="nav-link" onclick="switchNavTab('users', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <span>إدارة الموظفين والمستخدمين</span>
-                    <span class="nav-badge" style="background: #0284c7;">{{ count($allUsers) }}</span>
-                </button>
+                    <button class="nav-link" onclick="switchNavTab('users', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span>إدارة الموظفين والمستخدمين</span>
+                        <span class="nav-badge" style="background: #0284c7;">{{ count($allUsers) }}</span>
+                    </button>
 
-                <button class="nav-link" onclick="switchNavTab('audit', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    <span>سجل التدقيق الأمني (Audit)</span>
-                </button>
+                    <button class="nav-link" onclick="switchNavTab('audit', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>سجل التدقيق الأمني (Audit)</span>
+                    </button>
 
-                <button class="nav-link" onclick="switchNavTab('settings', this)">
-                    <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    <span>إعدادات وسياسات النظام</span>
-                </button>
+                    <button class="nav-link" onclick="switchNavTab('settings', this)">
+                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span>إعدادات وسياسات النظام</span>
+                    </button>
+                </div>
                 @endif
             </nav>
 
@@ -8149,6 +8163,17 @@
                 }
             }
 
+            // إذا كان التبويب ينتمي لمجموعة الإدارة والصلاحيات، تأكد أن القائمة مفتوحة
+            const adminTabs = ['roles', 'users', 'audit', 'settings'];
+            if (adminTabs.includes(tabId)) {
+                const c = document.getElementById('navGroupContent_admin');
+                const a = document.getElementById('navGroupArrow_admin');
+                if (c && c.style.display === 'none') {
+                    c.style.display = 'block';
+                    if (a) a.style.transform = 'rotate(180deg)';
+                }
+            }
+
             document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
             const targetPane = document.getElementById('tab-' + tabId);
             if (targetPane) targetPane.classList.add('active');
@@ -10014,6 +10039,19 @@
                     if (localStorage.getItem('nav_group_ops') === 'closed') {
                         const c = document.getElementById('navGroupContent_ops');
                         const a = document.getElementById('navGroupArrow_ops');
+                        if (c) c.style.display = 'none';
+                        if (a) a.style.transform = 'rotate(0deg)';
+                    }
+                } catch(e){}
+            }
+
+            // استرجاع حالة طي/فتح مجموعة الإدارة والصلاحيات
+            const adminGroupTabs = ['roles', 'users', 'audit', 'settings'];
+            if (!adminGroupTabs.includes(tabToOpen)) {
+                try {
+                    if (localStorage.getItem('nav_group_admin') === 'closed') {
+                        const c = document.getElementById('navGroupContent_admin');
+                        const a = document.getElementById('navGroupArrow_admin');
                         if (c) c.style.display = 'none';
                         if (a) a.style.transform = 'rotate(0deg)';
                     }
