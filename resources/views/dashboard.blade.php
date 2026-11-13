@@ -1211,16 +1211,9 @@
                     </button>
 
                     <button class="nav-link" onclick="switchNavTab('lifecycle', this)">
-                        <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                        <span>استحقاقات الفلاتر</span>
-                    </button>
-
-                    @if($isSuperAdmin || $isAdmin || $isGeneralMgr || $isCallCenter)
-                    <button class="nav-link" onclick="switchNavTab('service-dues', this)">
                         <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-                        <span>مستحقات الخدمة</span>
+                        <span>الاستحقاقات</span>
                     </button>
-                    @endif
 
                     <button class="nav-link" onclick="switchNavTab('tickets', this)">
                         <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -2113,118 +2106,283 @@
                 </div>
             </div>
 
-            <!-- ================= TAB 2: LIFECYCLE (استحقاقات الفلاتر والمواعيد) ================= -->
+            <!-- ================= TAB: ENTITLEMENTS (شاشة الاستحقاقات الموحدة) ================= -->
             <div id="tab-lifecycle" class="tab-pane">
-                <div class="glass table-card">
-                    <div class="card-header-flex">
-                        <div>
-                            <h2 class="card-title">
-                                <span style="color: #38bdf8;">💧</span>
-                                <span>محرك أعمار الفلاتر وجدول الاستحقاقات الدورية (Lifecycle Monitor)</span>
-                            </h2>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
-                                حساب ذكي لمواعيد استبدال الشمعات والممبرين بحسب جدول الاستهلاك والأيام المقدرة
-                            </p>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button class="btn btn-primary" onclick="openNewStageModal()">
-                                + جدولة استحقاق / مرحلة جديدة
-                            </button>
-                            <form action="{{ route('reminders.run') }}" method="POST" style="margin: 0;">
-                                @csrf
-                                <button type="submit" class="btn btn-outline" style="font-size: 0.8rem;">
-                                    🔄 فحص وإرسال التذكيرات
-                                </button>
-                            </form>
-                            <a href="{{ route('lifecycle.print') }}" target="_blank" class="btn btn-outline" style="font-size: 0.8rem;">
-                                🖨️ طباعة جدول الاستحقاقات PDF
-                            </a>
-                        </div>
-                    </div>
+                <!-- شريط التبديل العلوي لشاشة الاستحقاقات -->
+                <div style="display: flex; gap: 0.6rem; margin-bottom: 1.25rem; background: rgba(255,255,255,0.03); padding: 0.4rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); width: fit-content; flex-wrap: wrap;">
+                    <button type="button" id="btn-dues-sub-customers" class="btn" onclick="switchDuesSubView('customers', this)" style="display: flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.15rem; border-radius: 8px; border: none; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg, #10b981, #059669); color: #fff; box-shadow: 0 2px 4px rgba(16,185,129,0.3);">
+                        <span>👥</span>
+                        <span>متابعة مستحقات العملاء</span>
+                    </button>
+                    <button type="button" id="btn-dues-sub-stages" class="btn" onclick="switchDuesSubView('stages', this)" style="display: flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.15rem; border-radius: 8px; border: none; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8;">
+                        <span>🧪</span>
+                        <span>مراحل وصحة الفلاتر</span>
+                    </button>
+                </div>
 
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>العميل المستفيد</th>
-                                    <th>محطة التحلية</th>
-                                    <th>رقم المرحلة والشمعة</th>
-                                    <th>آخر استبدال</th>
-                                    <th>الاستحقاق القادم</th>
-                                    <th>الحالة الزمنية</th>
-                                    <th>العمليات التشغيلية</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($dueStages as $stage)
-                                <tr>
-                                    <td>
-                                        <div style="font-weight: 700;">{{ $stage->device?->customer?->name ?? 'غير محدد' }}</div>
-                                        <div style="font-size: 0.75rem; color: var(--text-dim);" class="num">{{ $stage->device?->customer?->primary_phone }}</div>
+                <!-- 1. القسم الأول: متابعة مستحقات العملاء والإجراءات (CRM & Customer Dues) -->
+                <div id="dues-sub-customers" class="dues-sub-view">
+                    <div class="glass table-card" style="padding: 1.25rem;">
+                        <div class="card-header-flex">
+                            <div>
+                                <h2 class="card-title">
+                                    <span style="color:#ef4444;">📋</span> مستحقات الخدمة — جدول العملاء
+                                </h2>
+                                <p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0 0;">
+                                    جميع العملاء المسجلين بأجهزة نشطة — تابع مواعيد الصيانة الدورية وسجل المكالمات واتخذ الإجراءات
+                                </p>
+                            </div>
+                            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                                <!-- فلتر الحالة -->
+                                <select id="sdFilterStatus" onchange="filterServiceDues()" class="form-control" style="width:160px;font-size:0.8rem;">
+                                    <option value="">الكل</option>
+                                    <option value="green">🟢 يستحق هذا الشهر</option>
+                                    <option value="red">🔴 تحت الخدمة الآن</option>
+                                    <option value="yellow">🟡 موقوف / مشاكل</option>
+                                </select>
+                                <input type="text" id="sdSearch" oninput="filterServiceDues()" class="form-control" placeholder="🔍 بحث باسم العميل أو الهاتف..." style="width:220px;font-size:0.8rem;">
+                            </div>
+                        </div>
+
+                        <!-- مفتاح ألوان -->
+                        <div style="display:flex;gap:1rem;padding:0.75rem 1rem;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:1rem;flex-wrap:wrap;">
+                            <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#22c55e;"></span> يستحق خدمة هذا الشهر (30 يوم)</span>
+                            <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ef4444;"></span> تحت الخدمة الآن (فني مكلّف)</span>
+                            <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#eab308;"></span> موقوف / مشاكل في الخدمة</span>
+                            <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#94a3b8;"></span> لا يستحق قريباً</span>
+                        </div>
+
+                        <!-- جدول المستحقات -->
+                        <div class="table-wrap">
+                            <table class="data-table" id="serviceDuesTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>العميل</th>
+                                        <th>الهاتف</th>
+                                        <th>الجهاز / المرحلة</th>
+                                        <th>آخر صيانة</th>
+                                        <th>الموعد القادم</th>
+                                        <th>المتبقي</th>
+                                        <th>الحالة</th>
+                                        <th>آخر اتصال</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @forelse($serviceDues ?? [] as $i => $due)
+                                @php
+                                    $daysLeft = $due['days_left'];
+                                    $devStatus = $due['device_status'];
+                                    // تحديد لون الصف
+                                    if ($devStatus === 'suspended') {
+                                        $rowColor = 'rgba(234,179,8,0.08)';
+                                        $dotColor = '#eab308';
+                                        $sdLabel = '🟡 موقوف';
+                                        $sdClass = 'yellow';
+                                    } elseif ($devStatus === 'in_service') {
+                                        $rowColor = 'rgba(239,68,68,0.08)';
+                                        $dotColor = '#ef4444';
+                                        $sdLabel = '🔴 تحت الخدمة';
+                                        $sdClass = 'red';
+                                    } elseif ($daysLeft !== null && $daysLeft <= 30) {
+                                        $rowColor = 'rgba(34,197,94,0.08)';
+                                        $dotColor = '#22c55e';
+                                        $sdLabel = $daysLeft <= 0 ? '🔴 متأخر' : '🟢 هذا الشهر';
+                                        $sdClass = $daysLeft <= 0 ? 'red' : 'green';
+                                    } else {
+                                        $rowColor = 'transparent';
+                                        $dotColor = '#94a3b8';
+                                        $sdLabel = '⬜ لا يستحق';
+                                        $sdClass = 'grey';
+                                    }
+                                @endphp
+                                <tr style="background:{{ $rowColor }};" data-sd-status="{{ $sdClass }}"
+                                    data-sd-text="{{ strtolower($due['customer_name'] . ' ' . $due['phone']) }}">
+                                    <td class="num">{{ $i + 1 }}</td>
+                                    <td style="font-weight:700;">{{ $due['customer_name'] }}</td>
+                                    <td style="direction:ltr;text-align:right;font-size:0.85rem;">{{ $due['phone'] }}</td>
+                                    <td style="font-size:0.82rem;">{{ $due['device_name'] }}<br><span style="color:var(--text-secondary);">{{ $due['stage_name'] }}</span></td>
+                                    <td style="font-size:0.82rem;">{{ $due['last_replacement'] ?? '—' }}</td>
+                                    <td style="font-weight:700;font-size:0.85rem;color:{{ $daysLeft !== null && $daysLeft <= 7 ? '#ef4444' : 'inherit' }};">
+                                        {{ $due['next_due'] ?? '—' }}
                                     </td>
                                     <td>
-                                        <div style="font-weight: 600;">{{ $stage->device?->model?->name ?? 'محطة تحلية' }}</div>
-                                        <div style="font-size: 0.75rem; color: var(--text-dim);" class="num">SN: {{ $stage->device?->serial_number ?? $stage->device?->device_code }}</div>
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-assigned num">مرحلة {{ $stage->stage_number }}</span>
-                                        <span style="font-weight: 600; margin-right: 0.35rem;">{{ $stage->stage_name_ar }}</span>
-                                        <div style="font-size: 0.7rem; color: var(--text-dim);">كل {{ $stage->service_interval_days }} يوم</div>
-                                    </td>
-                                    <td class="num" style="color: var(--text-muted);">{{ $stage->last_actual_replacement_at?->format('Y-m-d') ?? 'تاريخ التركيب' }}</td>
-                                    <td class="num" style="font-weight: 700; color: #38bdf8;">{{ $stage->next_due_at?->format('Y-m-d') }}</td>
-                                    <td>
-                                        @if($stage->isOverdue())
-                                            <span class="badge badge-overdue">متأخرة عن الموعد</span>
-                                        @elseif($stage->isDueToday())
-                                            <span class="badge badge-due-today">مستحقة اليوم</span>
+                                        @if($daysLeft !== null)
+                                            @if($daysLeft < 0)
+                                                <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef4444;">
+                                                    متأخر {{ abs($daysLeft) }} يوم
+                                                </span>
+                                            @elseif($daysLeft === 0)
+                                                <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;">اليوم!</span>
+                                            @elseif($daysLeft <= 7)
+                                                <span class="badge" style="background:rgba(234,179,8,0.15);color:#eab308;">{{ $daysLeft }} أيام</span>
+                                            @else
+                                                <span class="badge">{{ $daysLeft }} يوم</span>
+                                            @endif
                                         @else
-                                            <span class="badge badge-upcoming">قادمة قريباً</span>
+                                            <span style="color:var(--text-secondary);">—</span>
                                         @endif
                                     </td>
                                     <td>
-                                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                                            <!-- استبدال فوري -->
-                                            <form action="{{ route('lifecycle.stages.replace', $stage->id) }}" method="POST" style="margin:0;" onsubmit="return confirm('تأكيد تسجيل استبدال الشمعة اليوم وتحديث الموعد القادم تلقائياً؟');">
-                                                @csrf
-                                                <button type="submit" class="btn btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #10b981;" title="تسجيل استبدال فوري اليوم">
-                                                    ⚡ تم الاستبدال
-                                                </button>
-                                            </form>
-
-                                            <!-- فتح تذكرة صيانة -->
-                                            <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="openCreateTicketForStage({{ $stage->device?->customer_id }}, {{ $stage->customer_device_id }}, '{{ addslashes($stage->stage_name_ar) }}')" title="جدولة تذكرة صيانة">
-                                                📋 تذكرة
+                                        <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;">
+                                            <span style="width:9px;height:9px;border-radius:50%;background:{{ $dotColor }};display:inline-block;"></span>
+                                            {{ $sdLabel }}
+                                        </span>
+                                    </td>
+                                    <td style="font-size:0.78rem;color:var(--text-secondary);">
+                                        @if($due['last_call'])
+                                            {{ $due['last_call_outcome'] }}<br>{{ $due['last_call'] }}
+                                        @else
+                                            <span style="color:#94a3b8;">لا يوجد</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.78rem;"
+                                            onclick="openServiceDueModal({{ json_encode($due) }})">
+                                            ⚡ إجراء
+                                        </button>
+                                        @if($isSuperAdmin || $isAdmin || $isGeneralMgr)
+                                        <form method="POST" action="{{ route('service-dues.interaction.delete', $due['latest_interaction_id'] ?? 0) }}"
+                                            style="display:inline;"
+                                            onsubmit="return confirm('حذف آخر سجل تفاعل لهذا العميل؟');">
+                                            @csrf
+                                            <input type="hidden" name="_active_tab" value="service-dues">
+                                            <button type="submit" class="btn btn-outline" style="padding:0.3rem 0.6rem;font-size:0.78rem;border-color:#ef4444;color:#ef4444;"
+                                                {{ !$due['latest_interaction_id'] ? 'disabled' : '' }}>
+                                                🗑️
                                             </button>
-
-                                            <!-- تعديل الموعد -->
-                                            <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="openEditStageModal({{ $stage->id }}, '{{ addslashes($stage->stage_name_ar) }}', {{ $stage->service_interval_days }}, '{{ $stage->next_due_at?->format('Y-m-d') }}')" title="تعديل موعد الاستحقاق">
-                                                📅 تعديل
-                                            </button>
-
-                                            <!-- حذف -->
-                                            <form action="{{ route('lifecycle.stages.delete', $stage->id) }}" method="POST" style="margin:0;" onsubmit="return confirm('هل أنت متأكد من حذف هذه المرحلة؟');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-outline" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; color: #ef4444; border-color: rgba(239,68,68,0.3);" title="حذف المرحلة">
-                                                    🗑️
-                                                </button>
-                                            </form>
-                                        </div>
+                                        </form>
+                                        @endif
                                     </td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="7" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-dim);">
-                                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💧</div>
-                                        <div style="font-weight: 700; font-size: 1rem; color: var(--text-main); margin-bottom: 0.25rem;">لا توجد استحقاقات فلاتر مجدولة حالياً</div>
-                                        <div style="font-size: 0.85rem; margin-bottom: 1.25rem;">يمكنك إضافة محطة تحلية للعميل أو جدولة مراحل الفلاتر يدوياً الآن</div>
-                                        <button class="btn btn-primary" onclick="openNewDeviceModal()">+ إضافة محطة تحلية للعميل وتوليد الفلاتر تلقائياً</button>
+                                    <td colspan="10" style="text-align:center;padding:3rem;color:var(--text-secondary);">
+                                        <div style="font-size:2.5rem;margin-bottom:0.5rem;">📋</div>
+                                        <div>لا يوجد عملاء مسجلون بأجهزة حتى الآن</div>
                                     </td>
                                 </tr>
                                 @endforelse
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. القسم الثاني: مراحل وصحة الفلاتر (Lifecycle Monitor) -->
+                <div id="dues-sub-stages" class="dues-sub-view" style="display: none;">
+                    <div class="glass table-card">
+                        <div class="card-header-flex">
+                            <div>
+                                <h2 class="card-title">
+                                    <span style="color: #38bdf8;">💧</span>
+                                    <span>محرك أعمار الفلاتر وجدول الاستحقاقات الدورية (Lifecycle Monitor)</span>
+                                </h2>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                    حساب ذكي لمواعيد استبدال الشمعات والممبرين بحسب جدول الاستهلاك والأيام المقدرة
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button class="btn btn-primary" onclick="openNewStageModal()">
+                                    + جدولة استحقاق / مرحلة جديدة
+                                </button>
+                                <form action="{{ route('reminders.run') }}" method="POST" style="margin: 0;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline" style="font-size: 0.8rem;">
+                                        🔄 فحص وإرسال التذكيرات
+                                    </button>
+                                </form>
+                                <a href="{{ route('lifecycle.print') }}" target="_blank" class="btn btn-outline" style="font-size: 0.8rem;">
+                                    🖨️ طباعة جدول الاستحقاقات PDF
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>العميل المستفيد</th>
+                                        <th>محطة التحلية</th>
+                                        <th>رقم المرحلة والشمعة</th>
+                                        <th>آخر استبدال</th>
+                                        <th>الاستحقاق القادم</th>
+                                        <th>الحالة الزمنية</th>
+                                        <th>العمليات التشغيلية</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($dueStages as $stage)
+                                    <tr>
+                                        <td>
+                                            <div style="font-weight: 700;">{{ $stage->device?->customer?->name ?? 'غير محدد' }}</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-dim);" class="num">{{ $stage->device?->customer?->primary_phone }}</div>
+                                        </td>
+                                        <td>
+                                            <div style="font-weight: 600;">{{ $stage->device?->model?->name ?? 'محطة تحلية' }}</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-dim);" class="num">SN: {{ $stage->device?->serial_number ?? $stage->device?->device_code }}</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-assigned num">مرحلة {{ $stage->stage_number }}</span>
+                                            <span style="font-weight: 600; margin-right: 0.35rem;">{{ $stage->stage_name_ar }}</span>
+                                            <div style="font-size: 0.7rem; color: var(--text-dim);">كل {{ $stage->service_interval_days }} يوم</div>
+                                        </td>
+                                        <td class="num" style="color: var(--text-muted);">{{ $stage->last_actual_replacement_at?->format('Y-m-d') ?? 'تاريخ التركيب' }}</td>
+                                        <td class="num" style="font-weight: 700; color: #38bdf8;">{{ $stage->next_due_at?->format('Y-m-d') }}</td>
+                                        <td>
+                                            @if($stage->isOverdue())
+                                                <span class="badge badge-overdue">متأخرة عن الموعد</span>
+                                            @elseif($stage->isDueToday())
+                                                <span class="badge badge-due-today">مستحقة اليوم</span>
+                                            @else
+                                                <span class="badge badge-upcoming">قادمة قريباً</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                                                <!-- استبدال فوري -->
+                                                <form action="{{ route('lifecycle.stages.replace', $stage->id) }}" method="POST" style="margin:0;" onsubmit="return confirm('تأكيد تسجيل استبدال الشمعة اليوم وتحديث الموعد القادم تلقائياً؟');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #10b981;" title="تسجيل استبدال فوري اليوم">
+                                                        ⚡ تم الاستبدال
+                                                    </button>
+                                                </form>
+
+                                                <!-- فتح تذكرة صيانة -->
+                                                <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="openCreateTicketForStage({{ $stage->device?->customer_id }}, {{ $stage->customer_device_id }}, '{{ addslashes($stage->stage_name_ar) }}')" title="جدولة تذكرة صيانة">
+                                                    📋 تذكرة
+                                                </button>
+
+                                                <!-- تعديل الموعد -->
+                                                <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="openEditStageModal({{ $stage->id }}, '{{ addslashes($stage->stage_name_ar) }}', {{ $stage->service_interval_days }}, '{{ $stage->next_due_at?->format('Y-m-d') }}')" title="تعديل موعد الاستحقاق">
+                                                    📅 تعديل
+                                                </button>
+
+                                                <!-- حذف -->
+                                                <form action="{{ route('lifecycle.stages.delete', $stage->id) }}" method="POST" style="margin:0;" onsubmit="return confirm('هل أنت متأكد من حذف هذه المرحلة؟');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-outline" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; color: #ef4444; border-color: rgba(239,68,68,0.3);" title="حذف المرحلة">
+                                                        🗑️
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-dim);">
+                                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💧</div>
+                                            <div style="font-weight: 700; font-size: 1rem; color: var(--text-main); margin-bottom: 0.25rem;">لا توجد استحقاقات فلاتر مجدولة حالياً</div>
+                                            <div style="font-size: 0.85rem; margin-bottom: 1.25rem;">يمكنك إضافة محطة تحلية للعميل أو جدولة مراحل الفلاتر يدوياً الآن</div>
+                                            <button class="btn btn-primary" onclick="openNewDeviceModal()">+ إضافة محطة تحلية للعميل وتوليد الفلاتر تلقائياً</button>
+                                        </td>
+                                    </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4453,155 +4611,8 @@
                 </div>
             </div>
 
-            <!-- ================= TAB: SERVICE DUES (مستحقات الخدمة) ================= -->
-            @if($isSuperAdmin || $isAdmin || $isGeneralMgr || $isCallCenter)
-            <div id="tab-service-dues" class="tab-pane">
-                <div class="card-header-flex">
-                    <div>
-                        <h2 class="card-title">
-                            <span style="color:#ef4444;">📋</span> مستحقات الخدمة — جدول العملاء
-                        </h2>
-                        <p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0 0;">
-                            جميع العملاء المسجلين بأجهزة نشطة — تابع مواعيد الصيانة واتخذ الإجراءات
-                        </p>
-                    </div>
-                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-                        <!-- فلتر الحالة -->
-                        <select id="sdFilterStatus" onchange="filterServiceDues()" class="form-control" style="width:160px;font-size:0.8rem;">
-                            <option value="">الكل</option>
-                            <option value="green">🟢 يستحق هذا الشهر</option>
-                            <option value="red">🔴 تحت الخدمة الآن</option>
-                            <option value="yellow">🟡 موقوف / مشاكل</option>
-                        </select>
-                        <input type="text" id="sdSearch" oninput="filterServiceDues()" class="form-control" placeholder="🔍 بحث باسم العميل أو الهاتف..." style="width:220px;font-size:0.8rem;">
-                    </div>
-                </div>
-
-                <!-- مفتاح ألوان -->
-                <div style="display:flex;gap:1rem;padding:0.75rem 1rem;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:1rem;flex-wrap:wrap;">
-                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#22c55e;"></span> يستحق خدمة هذا الشهر (30 يوم)</span>
-                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ef4444;"></span> تحت الخدمة الآن (فني مكلّف)</span>
-                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#eab308;"></span> موقوف / مشاكل في الخدمة</span>
-                    <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#94a3b8;"></span> لا يستحق قريباً</span>
-                </div>
-
-                <!-- جدول المستحقات -->
-                <div class="table-wrap">
-                    <table class="data-table" id="serviceDuesTable">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>العميل</th>
-                                <th>الهاتف</th>
-                                <th>الجهاز / المرحلة</th>
-                                <th>آخر صيانة</th>
-                                <th>الموعد القادم</th>
-                                <th>المتبقي</th>
-                                <th>الحالة</th>
-                                <th>آخر اتصال</th>
-                                <th>الإجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        @forelse($serviceDues ?? [] as $i => $due)
-                        @php
-                            $daysLeft = $due['days_left'];
-                            $devStatus = $due['device_status'];
-                            // تحديد لون الصف
-                            if ($devStatus === 'suspended') {
-                                $rowColor = 'rgba(234,179,8,0.08)';
-                                $dotColor = '#eab308';
-                                $sdLabel = '🟡 موقوف';
-                                $sdClass = 'yellow';
-                            } elseif ($devStatus === 'in_service') {
-                                $rowColor = 'rgba(239,68,68,0.08)';
-                                $dotColor = '#ef4444';
-                                $sdLabel = '🔴 تحت الخدمة';
-                                $sdClass = 'red';
-                            } elseif ($daysLeft !== null && $daysLeft <= 30) {
-                                $rowColor = 'rgba(34,197,94,0.08)';
-                                $dotColor = '#22c55e';
-                                $sdLabel = $daysLeft <= 0 ? '🔴 متأخر' : '🟢 هذا الشهر';
-                                $sdClass = $daysLeft <= 0 ? 'red' : 'green';
-                            } else {
-                                $rowColor = 'transparent';
-                                $dotColor = '#94a3b8';
-                                $sdLabel = '⬜ لا يستحق';
-                                $sdClass = 'grey';
-                            }
-                        @endphp
-                        <tr style="background:{{ $rowColor }};" data-sd-status="{{ $sdClass }}"
-                            data-sd-text="{{ strtolower($due['customer_name'] . ' ' . $due['phone']) }}">
-                            <td class="num">{{ $i + 1 }}</td>
-                            <td style="font-weight:700;">{{ $due['customer_name'] }}</td>
-                            <td style="direction:ltr;text-align:right;font-size:0.85rem;">{{ $due['phone'] }}</td>
-                            <td style="font-size:0.82rem;">{{ $due['device_name'] }}<br><span style="color:var(--text-secondary);">{{ $due['stage_name'] }}</span></td>
-                            <td style="font-size:0.82rem;">{{ $due['last_replacement'] ?? '—' }}</td>
-                            <td style="font-weight:700;font-size:0.85rem;color:{{ $daysLeft !== null && $daysLeft <= 7 ? '#ef4444' : 'inherit' }};">
-                                {{ $due['next_due'] ?? '—' }}
-                            </td>
-                            <td>
-                                @if($daysLeft !== null)
-                                    @if($daysLeft < 0)
-                                        <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef4444;">
-                                            متأخر {{ abs($daysLeft) }} يوم
-                                        </span>
-                                    @elseif($daysLeft === 0)
-                                        <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;">اليوم!</span>
-                                    @elseif($daysLeft <= 7)
-                                        <span class="badge" style="background:rgba(234,179,8,0.15);color:#eab308;">{{ $daysLeft }} أيام</span>
-                                    @else
-                                        <span class="badge">{{ $daysLeft }} يوم</span>
-                                    @endif
-                                @else
-                                    <span style="color:var(--text-secondary);">—</span>
-                                @endif
-                            </td>
-                            <td>
-                                <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;">
-                                    <span style="width:9px;height:9px;border-radius:50%;background:{{ $dotColor }};display:inline-block;"></span>
-                                    {{ $sdLabel }}
-                                </span>
-                            </td>
-                            <td style="font-size:0.78rem;color:var(--text-secondary);">
-                                @if($due['last_call'])
-                                    {{ $due['last_call_outcome'] }}<br>{{ $due['last_call'] }}
-                                @else
-                                    <span style="color:#94a3b8;">لا يوجد</span>
-                                @endif
-                            </td>
-                            <td>
-                                <button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.78rem;"
-                                    onclick="openServiceDueModal({{ json_encode($due) }})">
-                                    ⚡ إجراء
-                                </button>
-                                @if($isSuperAdmin || $isAdmin || $isGeneralMgr)
-                                <form method="POST" action="{{ route('service-dues.interaction.delete', $due['latest_interaction_id'] ?? 0) }}"
-                                    style="display:inline;"
-                                    onsubmit="return confirm('حذف آخر سجل تفاعل لهذا العميل؟');">
-                                    @csrf
-                                    <input type="hidden" name="_active_tab" value="service-dues">
-                                    <button type="submit" class="btn btn-outline" style="padding:0.3rem 0.6rem;font-size:0.78rem;border-color:#ef4444;color:#ef4444;"
-                                        {{ !$due['latest_interaction_id'] ? 'disabled' : '' }}>
-                                        🗑️
-                                    </button>
-                                </form>
-                                @endif
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="10" style="text-align:center;padding:3rem;color:var(--text-secondary);">
-                                <div style="font-size:2.5rem;margin-bottom:0.5rem;">📋</div>
-                                <div>لا يوجد عملاء مسجلون بأجهزة حتى الآن</div>
-                            </td>
-                        </tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            @endif
+            <!-- مسار توافقي للاستحقاقات -->
+            <div id="tab-service-dues" style="display:none;"></div>
 
             <!-- ================= TAB: PRODUCTS SCREEN (شاشة الأصناف) ================= -->
             @if($isSuperAdmin || $isSystemAdmin || $isAccountant)
@@ -8084,8 +8095,8 @@
             'hr': 'بوابة الموارد البشرية وإدارة الكادر',
             'overview': 'لوحة المؤشرات والتشغيل العام',
             'appointments': 'إضافة وجدولة مواعيد العملاء والفنيين',
-            'lifecycle': 'محرك استحقاقات الفلاتر والمواعيد',
-            'service-dues': 'مستحقات الخدمة — جدول العملاء والإجراءات',
+            'lifecycle': 'شاشة الاستحقاقات — متابعة مستحقات العملاء وصحة الفلاتر',
+            'service-dues': 'شاشة الاستحقاقات — متابعة مستحقات العملاء وصحة الفلاتر',
             'tickets': 'إدارة تذاكر الصيانة والعمليات',
             'customers': 'ملفات العملاء ومحطات التحلية',
             'sales': 'شاشة المبيعات ونقاط البيع والفواتير الضريبية',
@@ -8143,8 +8154,44 @@
             }
         }
 
+        // Sub-tabs for Entitlements (الاستحقاقات الموحدة)
+        function switchDuesSubView(view, btn) {
+            document.querySelectorAll('.dues-sub-view').forEach(el => el.style.display = 'none');
+            const target = document.getElementById('dues-sub-' + view);
+            if (target) target.style.display = 'block';
+
+            const btnCustomers = document.getElementById('btn-dues-sub-customers');
+            const btnStages = document.getElementById('btn-dues-sub-stages');
+            if (btnCustomers && btnStages) {
+                btnCustomers.style.background = 'transparent';
+                btnCustomers.style.color = '#94a3b8';
+                btnCustomers.style.boxShadow = 'none';
+
+                btnStages.style.background = 'transparent';
+                btnStages.style.color = '#94a3b8';
+                btnStages.style.boxShadow = 'none';
+
+                if (view === 'customers') {
+                    btnCustomers.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                    btnCustomers.style.color = '#ffffff';
+                    btnCustomers.style.boxShadow = '0 2px 4px rgba(16,185,129,0.3)';
+                } else {
+                    btnStages.style.background = 'linear-gradient(135deg, #0284c7, #0369a1)';
+                    btnStages.style.color = '#ffffff';
+                    btnStages.style.boxShadow = '0 2px 4px rgba(2,132,199,0.3)';
+                }
+            }
+            try { localStorage.setItem('dues_active_subview', view); } catch(e){}
+        }
+
         // Tab Switcher — saves active tab to localStorage so after form submit it restores
         function switchNavTab(tabId, btnEl) {
+            // توجيه تلقائي لمستحقات الخدمة داخل شاشة الاستحقاقات الموحدة
+            if (tabId === 'service-dues') {
+                tabId = 'lifecycle';
+                switchDuesSubView('customers', document.getElementById('btn-dues-sub-customers'));
+            }
+
             document.querySelectorAll('.sidebar-nav .nav-link').forEach(btn => btn.classList.remove('active'));
             if (!btnEl) {
                 btnEl = document.querySelector(`.sidebar-nav .nav-link[onclick*="'${tabId}'"]`)
@@ -10031,6 +10078,15 @@
             const navBtn = document.querySelector(`.nav-link[onclick*="'${tabToOpen}'"]`)
                         || document.querySelector(`[onclick*="switchNavTab('${tabToOpen}'"]`);
             switchNavTab(tabToOpen, navBtn);
+
+            // استرجاع التبويب الداخلي لشاشة الاستحقاقات
+            try {
+                const duesSavedSub = (urlTab === 'service-dues' || sessionTab === 'service-dues') 
+                    ? 'customers' 
+                    : (localStorage.getItem('dues_active_subview') || 'customers');
+                const duesBtn = document.getElementById('btn-dues-sub-' + duesSavedSub);
+                switchDuesSubView(duesSavedSub, duesBtn);
+            } catch(e){}
 
             // استرجاع حالة طي/فتح مجموعة التشغيل والميدان
             const opsGroupTabs = ['overview', 'appointments', 'lifecycle', 'service-dues', 'tickets', 'customers'];
