@@ -1222,7 +1222,7 @@
 
                     <button class="nav-link" onclick="switchNavTab('customers', this)">
                         <svg fill="none" stroke="currentColor" width="20" height="20" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                        <span>العملاء ومحطات التحلية</span>
+                        <span>العملاء</span>
                     </button>
                 </div>
                 @else
@@ -8098,7 +8098,7 @@
             'lifecycle': 'شاشة الاستحقاقات — متابعة مستحقات العملاء وصحة الفلاتر',
             'service-dues': 'شاشة الاستحقاقات — متابعة مستحقات العملاء وصحة الفلاتر',
             'tickets': 'إدارة تذاكر الصيانة والعمليات',
-            'customers': 'ملفات العملاء ومحطات التحلية',
+            'customers': 'ملفات العملاء',
             'sales': 'شاشة المبيعات ونقاط البيع والفواتير الضريبية',
             'suppliers': 'شاشة الموردين وإدارة المشتريات والتوريد',
             'inventory': 'المخزون المركزي وسيارات الفنيين',
